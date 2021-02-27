@@ -1,0 +1,104 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 466af810348524345988571428f0ce3cc5d476e8b112b26e57e5b6132f2ba215
+
+name:           luukasa
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/luukasa#readme>
+homepage:       https://github.com/orouvinen/luukasa#readme
+bug-reports:    https://github.com/orouvinen/luukasa/issues
+author:         Olli Rouvinen
+maintainer:     olli.rouvinen@gmail.com
+copyright:      2021 Olli Rouvinen
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/orouvinen/luukasa
+
+library
+  exposed-modules:
+      AppState
+      Body
+      Calc
+      EventHandler
+      Joint
+      JointSelect
+      Render
+      Tree
+      UiEventHandler
+      Units
+  other-modules:
+      Paths_luukasa
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , gi-cairo
+    , gi-cairo-connector
+    , gi-cairo-render
+    , gi-gdk
+    , gi-glib
+    , gi-gtk
+    , haskell-gi-base
+    , mtl
+    , text
+  default-language: Haskell2010
+
+executable luukasa-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_luukasa
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , gi-cairo
+    , gi-cairo-connector
+    , gi-cairo-render
+    , gi-gdk
+    , gi-glib
+    , gi-gtk
+    , haskell-gi-base
+    , luukasa
+    , mtl
+    , text
+  default-language: Haskell2010
+
+test-suite luukasa-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      BodySpec
+      TreeSpec
+      Paths_luukasa
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , gi-cairo
+    , gi-cairo-connector
+    , gi-cairo-render
+    , gi-gdk
+    , gi-glib
+    , gi-gtk
+    , haskell-gi-base
+    , hspec
+    , luukasa
+    , mtl
+    , text
+  default-language: Haskell2010

@@ -1,0 +1,60 @@
+name:                luukasa
+version:             0.1.0.0
+github:              "orouvinen/luukasa"
+license:             BSD3
+author:              "Olli Rouvinen"
+maintainer:          "olli.rouvinen@gmail.com"
+copyright:           "2021 Olli Rouvinen"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/luukasa#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- containers
+- text
+- haskell-gi-base
+- mtl
+- gi-gtk
+- gi-gdk
+- gi-cairo
+- gi-glib
+- gi-cairo-render
+- gi-cairo-connector
+
+
+library:
+  source-dirs: src
+
+executables:
+  luukasa-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - luukasa
+
+tests:
+  luukasa-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - luukasa
+    - hspec
