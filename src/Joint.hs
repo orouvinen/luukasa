@@ -9,9 +9,11 @@ data JointLockMode
     -- Child joints will stay where they are
     = NoLock
     -- Children's distance to the rotated joint will be kept, but no rotation is applied to the children
-    | DragChildren
+    | Drag
     -- Children rotate with the rotated joint (around the common parent)
-    | RotateChildren
+    | Rotate
+    deriving Show
+
 
 data Joint = Joint
     { jointId       :: JointId
@@ -25,27 +27,34 @@ data Joint = Joint
 instance Eq Joint where
     a == b = jointId a == jointId b
 
-setChildAngleAndRadius :: Joint -> Joint -> Joint
+{- |
+Used to keep joint's geometric relation to its parent in check
+after rotating or translating the parent joint.
+-}
+setChildAngleAndRadius
+    :: Joint    -- ^ Parent. Position of parent would have been changed.
+    -> Joint    -- ^ Child to be updated.
+    -> Joint
 setChildAngleAndRadius parent child =
     let (x, y) = (jointX child, jointY child)
         (x', y') = (jointX parent, jointY parent)
         radius = distance x' y' x y
         worldRot = angle x' y' x y
-        localRot = rotd worldRot (-jointWorldRot parent)
+        localRot = rotd worldRot (getDegrees $ -jointWorldRot parent)
     in child { jointLocalRot = localRot, jointWorldRot = worldRot, jointR = radius }
 
-rotate :: JointLockMode -> Degrees -> Joint -> Joint -> Joint
-rotate lockMode d parent rotatee =
+rotate :: Double -> Joint -> Joint -> Joint
+rotate deg parent rotatee =
     let
         -- Update angle of rotation
-        localRot = rotd (jointLocalRot rotatee) d
-        worldRot = rotd (jointWorldRot rotatee) d
+        localRot = rotd (jointLocalRot rotatee) deg
+        worldRot = rotd (jointWorldRot rotatee) deg
         -- Translate based on new rotation
-        x = jointX parent + (jointR rotatee * cos (getRadians . rad $ jointWorldRot rotatee))
-        y = jointY parent + (jointR rotatee * sin (getRadians . rad $ jointWorldRot rotatee))
-        -- dx = x - jointX rotatee
-        -- dy = y - jointY rotatee
+        x = jointX parent + (jointR rotatee * cos (getRadians . rad $ worldRot))
+        y = jointY parent + (jointR rotatee * sin (getRadians . rad $ worldRot))
     in
         rotatee { jointX = x, jointY = y, jointLocalRot = localRot, jointWorldRot = worldRot }
+
+
 
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module EventHandler (Event(..), dispatchAction) where
 
 import qualified AppState      as ST
@@ -13,7 +12,7 @@ import           Units         (Degrees, getDegrees)
 data Event
     = CreateJoint Int Int
     | TrySelect Int Int
-    | Rotate Degrees
+    | Rotate J.JointId Double
 
 dispatchAction :: ST.AppState -> Event -> ST.AppState
 dispatchAction s e =
@@ -39,20 +38,21 @@ dispatchAction s e =
                 Just jointId -> s { ST.selectedJointIds = [jointId]}
                 Nothing      -> s
 
-        Rotate (getDegrees -> x) ->
-            let selectedIds = ST.selectedJointIds s
-                selectedJoints = [ j | j <- toList $ B.root body, J.jointId j `elem` selectedIds]
-                parents = B.getParent body <$> selectedIds
-                parentChild = zip parents selectedJoints
-            in s
-
+        Rotate jointId deg ->
+            let rotatedJointNode = T.findBy (\j -> J.jointId j == jointId) (B.root body)
+            in case rotatedJointNode of
+                Nothing -> s
+                Just node ->
+                    let joint = T.val node
+                    in s { ST.body = B.rotate body (ST.jointLockMode s) deg joint }
 
 createJoint :: B.Body -> J.JointId -> J.JointId -> Double -> Double -> B.Body
 createJoint body parentJointId jointId x y =
     let parent = T.val $ fromJust $ T.findBy (\j -> J.jointId j == parentJointId) (B.root body) -- TODO: something something meh fromJust something
         newJoint =
             J.setChildAngleAndRadius
-                parent (J.Joint
+                parent
+                (J.Joint
                     { J.jointX = x
                     , J.jointY = y
                     , J.jointId = jointId

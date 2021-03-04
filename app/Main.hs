@@ -26,8 +26,6 @@ main = do
     buildUi stateRef
     Gtk.main
 
-    -- endState <- readIORef stateRef
-    -- return ()
 
 buildUi :: IORef AppState -> IO ()
 buildUi state = do
@@ -51,7 +49,8 @@ buildUi state = do
         return True
 
 
-    Gtk.widgetAddEvents canvas [Gdk.EventMaskButtonPressMask, Gdk.EventMaskKeyPressMask, Gdk.EventMaskScrollMask]
+    Gtk.widgetAddEvents canvas [Gdk.EventMaskButtonPressMask, Gdk.EventMaskScrollMask]
+
     _ <- Gtk.onWidgetButtonPressEvent canvas $ \ev -> do
         _ <- EV.canvasMouseButtonClick state ev
         Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
@@ -69,8 +68,9 @@ buildUi state = do
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
         _ <- EV.canvasKeyPress state ev
-        Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
-        return True
+        --Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
+        Gtk.widgetQueueDraw canvas
+        return False
 
     -- Put all the parts together
     Gtk.gridAttach grid canvas 0 1 1 1

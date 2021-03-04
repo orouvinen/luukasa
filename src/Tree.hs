@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor  #-}
-module Tree (Tree, val, children, create, insert, delete, findBy) where
+module Tree (Tree, val, children, create, insert, delete, findBy, replaceVal, replaceNode, setVal, setChildren) where
 
 import           Data.List  (find, intersperse)
 import           Data.Maybe (catMaybes)
@@ -32,6 +32,12 @@ children = _children
 val :: Tree a -> a
 val = _val
 
+setVal :: Tree a -> a -> Tree a
+setVal node x = node { _val = x }
+
+setChildren :: Tree a -> [Tree a] -> Tree a
+setChildren node xs = node { _children = xs }
+
 create :: a -> Tree a
 create x = Node
     { _val = x
@@ -41,10 +47,11 @@ create x = Node
     , depth = 0
     }
 
--- |Insert a new value into an existing tree.
--- The new node of the value will be child of the *first* such node that the parent predicate (the 2nd argument)
--- returns True. Ordering isn't guaranteed, so if there's one specific node you're after, you should make
--- your values unique, for example using some kind of Id field.
+{- | Insert a new value into an existing tree.
+The new node of the value will be child of the *first* such node that the parent predicate (the 2nd argument)
+returns True. Ordering isn't guaranteed, so if there's one specific node you're after, you should make
+your values unique, for example using some kind of Id field.
+-}
 insert  :: a                    -- ^ Value to insert
         -> (a -> Bool)          -- ^ Predicate that should return True for the node value that is the parent of the new value node. The
         -> Tree a               -- ^ Root node. The parent node should be found somehwere under the root.
@@ -81,6 +88,21 @@ delete p root =
                 ownChildren = filter (/= toDelete) pChildren
             in root { _children = ownChildren ++ inheritedChildren}
 
+-- Just for a little rabbit hole, continue with this:
+-- replaceInTree :: (Tree a -> b) -> (b -> Bool) -> (Tree a -> Tree a) -> Tree a -> Tree a
+-- replaceInTree get match set root =
+
+-- TODO: these two replace functions look awfully alike
+replaceVal :: (a -> Bool) -> a -> Tree a -> Tree a
+replaceVal _ _ Empty = Empty
+replaceVal valueSelector newVal root
+    | valueSelector (_val root) = root { _val = newVal }
+    | otherwise = root { _children = replaceVal valueSelector newVal <$> _children root }
+
+replaceNode :: (Tree a -> Bool) -> Tree a -> Tree a -> Tree a
+replaceNode nodeSelector newNode root
+    | nodeSelector root = newNode
+    | otherwise = root { _children = replaceNode nodeSelector newNode <$> _children root }
 
 findBy :: (a -> Bool) -> Tree a -> Maybe (Tree a)
 findBy p root

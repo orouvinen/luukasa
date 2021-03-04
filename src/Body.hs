@@ -1,14 +1,18 @@
-module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, addJoint) where
+module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotate, addJoint) where
 
 import           Data.Function ((&))
 import           Data.List
 
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
-import           Joint         (Joint (..), JointId)
+import           Data.Maybe    (fromJust)
+import           Joint         (Joint (..), JointId, JointLockMode (..))
 import qualified Joint         as J
 import           Tree          (Tree)
-import qualified Tree          as T
+import qualified Tree          as T (children, create, findBy, insert,
+                                     replaceNode, replaceVal, setChildren,
+                                     setVal, val)
+import           Units
 rootJointId :: JointId
 rootJointId = 0
 
@@ -35,6 +39,61 @@ create =
         , translateY = 0
         , parentLookup = Map.empty
         }
+
+rotate :: Body -> JointLockMode -> Double -> Joint -> Body
+rotate body lockMode deg joint =
+    let isRotatee j = J.jointId j == J.jointId joint
+        parent = getParent body (J.jointId joint)
+        -- joint = T.val $ fromJust $ T.findBy isRotatee (root body)
+        originalX = J.jointX joint
+        originalY = J.jointY joint
+
+        rotated = J.rotate deg parent joint
+
+        dx = J.jointX rotated - originalX
+        dy = J.jointY rotated - originalY
+
+        -- TODO: this whole juggling of nodes and values is bit convoluted
+
+        -- Replace the original joint value
+        withJointRotated = T.replaceVal isRotatee rotated (root body)
+
+        -- Find node of the rotated joint
+        rotatedJointNode = fromJust $ T.findBy isRotatee withJointRotated
+
+        -- Modify children
+        newChildrenTree = T.setChildren rotatedJointNode
+            (rotateAdjustChild lockMode dx dy deg rotatedJointNode <$> T.children rotatedJointNode)
+
+        in body { root = T.replaceNode (isRotatee . T.val) newChildrenTree withJointRotated }
+
+
+-- TODO: holy shit this is ugly
+rotateAdjustChild :: JointLockMode -> Double -> Double -> Double -> Tree Joint -> Tree Joint -> Tree Joint
+rotateAdjustChild lockMode dx dy deg parentNode jointNode =
+    let parent = T.val parentNode
+        joint = T.val jointNode
+        (jx, jy) = (J.jointX joint, J.jointY joint)
+    in case lockMode of
+        NoLock -> T.setVal jointNode (J.setChildAngleAndRadius parent joint)
+
+        Drag ->
+            let node = T.setVal jointNode (joint { J.jointX = jx + dx, J.jointY = jy + dy })
+                children =
+                    rotateAdjustChild lockMode dx dy deg jointNode <$> T.children jointNode
+            in T.setChildren node children
+
+        Rotate ->
+            let parentX = J.jointX parent
+                parentY = J.jointY parent
+                -- TODO: it's hacky: J.rotate updates local rotation but we don't want that so
+                -- the value is preserved and replaced after the call
+                originalLocalRot = J.jointLocalRot joint
+                joint' = J.rotate deg parent joint
+                node = T.setVal jointNode joint' { J.jointLocalRot = originalLocalRot }
+                children = rotateAdjustChild lockMode dx dy deg jointNode <$> T.children jointNode
+            in  T.setChildren node children
+
 
 addJoint :: Body -> Joint -> Joint -> Body
 addJoint body parent joint = body

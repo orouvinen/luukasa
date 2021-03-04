@@ -1,6 +1,6 @@
 module Render (render) where
 
-import           AppState
+import qualified AppState             as ST
 import qualified Body                 as B
 import qualified Joint                as J
 
@@ -39,18 +39,19 @@ setSourceColor :: Color -> Render ()
 setSourceColor color = CR.setSourceRGB (r color) (g color) (b color)
 
 
--- render :: Gtk.IsWidget w => w -> Render Bool
-render :: IORef AppState -> Render Bool
+render :: IORef ST.AppState -> Render Bool
 render state = do
     s <- liftIO $ readIORef state
-    runReaderT doRender s
-    return False
 
-doRender :: ReaderT AppState Render ()
+    -- liftIO $ putStr $ "RENDER: " ++ ST.printState s
+    runReaderT doRender s
+    return True
+
+doRender :: ReaderT ST.AppState Render ()
 doRender = do
-    body' <- asks body
-    viewScale' <- asks viewScale
-    viewTranslate' <- asks viewTranslate
+    body' <- asks ST.body
+    viewScale' <- asks ST.viewScale
+    viewTranslate' <- asks ST.viewTranslate
     let limbs = B.limbSegments body'
     let joints = toList (B.root body')
 
@@ -68,18 +69,18 @@ doRender = do
             renderJoint j >> lift CR.restore)
         joints
 
-doRenderTranslate :: (Int, Int) -> ReaderT AppState Render ()
+doRenderTranslate :: (Int, Int) -> ReaderT ST.AppState Render ()
 doRenderTranslate tr = do
     let (x, y) = bimap fromIntegral fromIntegral tr
     lift $ CR.translate x y
 
-doRenderScale :: Double -> ReaderT AppState Render ()
+doRenderScale :: Double -> ReaderT ST.AppState Render ()
 doRenderScale scaleFactor =
     lift $ CR.scale scaleFactor scaleFactor
 
-renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT AppState Render ()
+renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AppState Render ()
 renderLimb limb color = do
-    scaleFactor <- asks viewScale
+    scaleFactor <- asks ST.viewScale
 
     let (x, y) = fst limb
     let (x', y') = snd limb
@@ -90,12 +91,12 @@ renderLimb limb color = do
         CR.setLineWidth $ fromIntegral limbWidth / scaleFactor
         CR.stroke
 
-renderJoint :: J.Joint -> ReaderT AppState Render ()
+renderJoint :: J.Joint -> ReaderT ST.AppState Render ()
 renderJoint j = do
     st <- ask
-    let scaleFactor = viewScale st
+    let scaleFactor = ST.viewScale st
 
-    let isJointSelected = isSelected st (J.jointId j)
+    let isJointSelected = ST.isSelected st (J.jointId j)
     let radius = fromIntegral (if isJointSelected then jointRadiusSelected else jointRadius) / scaleFactor
     let (x, y) = (J.jointX j, J.jointY j)
 

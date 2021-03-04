@@ -1,9 +1,10 @@
 module AppState where
 
-import           Body      (Body)
-import qualified Body      as B
-import qualified Data.Text as T
-import           Joint
+import           Body          (Body)
+import qualified Body          as B
+import           Data.Foldable (toList)
+import qualified Data.Text     as T
+import           Joint         (JointId, JointLockMode (..))
 
 data ActionState
     = Idle
@@ -22,6 +23,7 @@ data AppState = AppState
     , viewScale         :: Double
     , viewTranslate     :: (Int, Int)
     , selectedJointIds  :: [JointId]
+    , jointLockMode     :: JointLockMode
     } deriving (Show)
 
 
@@ -34,6 +36,7 @@ initialState = AppState
     , fileName = Nothing
     , viewScale = 1
     , viewTranslate = (0, 0)
+    , jointLockMode = Rotate
     }
 
 selectionSize :: AppState -> Int
@@ -41,3 +44,7 @@ selectionSize = length . selectedJointIds
 
 isSelected :: AppState -> JointId -> Bool
 isSelected s id = id `elem` selectedJointIds s
+
+
+printState :: AppState -> String
+printState s = (\j -> show j ++ "\n") <$> toList $ B.root (body s)

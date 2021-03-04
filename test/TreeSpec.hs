@@ -1,9 +1,10 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 module TreeSpec (spec) where
+import           Data.Foldable (toList)
 import           Data.Maybe
 import           Test.Hspec
 
-import qualified Tree       as T
+import qualified Tree          as T
 
 
 spec :: Spec
@@ -32,7 +33,10 @@ Test tree:
         -- Level 3
         let l3_child_1 = T.insert "L3 child1" (== "L2 child1") l2_child_1
         let l3_child_2 = T.insert "L3 child2" (== "L2 child1") l3_child_1
+        let finalTree = l3_child_2
+
         let deleteTestTree = l3_child_2
+        let replaceTestTree = T.replaceVal (== "L1 child1") "REPLACED" l3_child_2
 
         let noInsert = T.insert "nope" (== "invalidParent") l1_child_2
 
@@ -66,3 +70,15 @@ Test tree:
                 let l1c1 = T.findBy (== "L1 child1") res
                 l1c1 `shouldSatisfy` isJust
                 length (T.children (fromJust l1c1)) `shouldBe` 2
+
+        describe "replaceVal" $ do
+            it "replaces single node's value" $ do
+                let replacedNode = T.findBy (== "REPLACED") replaceTestTree
+                -- make sure there is the replaced node
+                replacedNode `shouldSatisfy` isJust
+                -- make sure size of tree didn't get affected
+                length replaceTestTree `shouldBe` length finalTree
+                -- finally, there should be exactly one node replaced in this particular case
+                let nodes = toList replaceTestTree
+                length [ n | n <- nodes, n == "REPLACED"] `shouldBe` 1
+

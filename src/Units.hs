@@ -3,11 +3,10 @@
 
 module Units (Radians, Degrees, mkRadians, mkDegrees, deg, getDegrees, rad, getRadians) where
 
-newtype Radians = Radians { getRadians :: Double } deriving newtype (Show, Num)
-newtype Degrees = Degrees { getDegrees :: Double } deriving newtype (Show, Num)
+newtype Radians = Radians { getRadians :: Double } deriving newtype (Show, Num, Ord, Eq)
+newtype Degrees = Degrees { getDegrees :: Double } deriving newtype (Show, Num, Ord, Eq)
 
 -- TODO: the "smart" constructors aren't so
-
 mkDegrees :: Double -> Degrees
 mkDegrees deg = Degrees deg
 
