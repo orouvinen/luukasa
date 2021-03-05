@@ -7,9 +7,9 @@ rotd :: Degrees -> Double -> Degrees
 rotd (getDegrees -> x) delta = mkDegrees $ rotated $ x + delta
   where
       rotated degrees
-        | degrees > 359 = degrees - 360
-        | degrees < 0   = degrees + 360
-        | otherwise     = degrees
+        | degrees >= 360    = degrees - 360
+        | degrees < 0       = degrees + 360
+        | otherwise         = degrees
 
 distance :: Double -> Double -> Double -> Double -> Double
 distance x y x' y' =
