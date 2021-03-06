@@ -13,6 +13,7 @@ import qualified Tree          as T (children, create, findBy, insert,
                                      replaceNode, replaceVal, setChildren,
                                      setVal, val)
 import           Units
+
 rootJointId :: JointId
 rootJointId = 0
 
@@ -44,7 +45,6 @@ rotate :: Body -> JointLockMode -> Double -> Joint -> Body
 rotate body lockMode deg joint =
     let isRotatee j = J.jointId j == J.jointId joint
         parent = getParent body (J.jointId joint)
-        -- joint = T.val $ fromJust $ T.findBy isRotatee (root body)
         originalX = J.jointX joint
         originalY = J.jointY joint
 
@@ -86,12 +86,13 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
         Rotate ->
             let parentX = J.jointX parent
                 parentY = J.jointY parent
-                -- TODO: it's hacky: J.rotate updates local rotation but we don't want that so
-                -- the value is preserved and replaced after the call
+
+                -- Follow parent's rotation but restore local rotation as it has not changed
                 originalLocalRot = J.jointLocalRot joint
                 joint' = J.rotate deg parent joint
                 node = T.setVal jointNode joint' { J.jointLocalRot = originalLocalRot }
-                children = rotateAdjustChild lockMode dx dy deg jointNode <$> T.children jointNode
+
+                children = rotateAdjustChild lockMode dx dy deg node <$> T.children node
             in  T.setChildren node children
 
 
