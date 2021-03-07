@@ -42,9 +42,14 @@ initialState = AppState
 selectionSize :: AppState -> Int
 selectionSize = length . selectedJointIds
 
-isSelected :: AppState -> JointId -> Bool
-isSelected s id = id `elem` selectedJointIds s
+-- isSelected :: AppState -> JointId -> Bool
+-- isSelected s id = id `elem` selectedJointIds s
 
+
+printJoints :: AppState -> String
+printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root (body s)
 
 printState :: AppState -> String
-printState s = (\j -> show j ++ "\n") <$> toList $ B.root (body s)
+printState s =
+    "Sel: " ++ show (selectedJointIds s) ++ "\n"
+    ++ "aState:" ++ show (actionState s) ++ "\n"

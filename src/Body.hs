@@ -3,6 +3,7 @@ module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getPar
 import           Data.Function ((&))
 import           Data.List
 
+import           Calc
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
 import           Data.Maybe    (fromJust)
@@ -19,7 +20,7 @@ rootJointId = 0
 
 data Body = Body
     { root         :: Tree Joint
-    , parentLookup :: Map JointId Joint
+    , parentLookup :: Map JointId JointId
     , translateX   :: Int
     , translateY   :: Int
     } deriving Show
@@ -41,8 +42,9 @@ create =
         , parentLookup = Map.empty
         }
 
-rotate :: Body -> JointLockMode -> Double -> Joint -> Body
-rotate body lockMode deg joint =
+
+rotate :: JointLockMode -> Double -> Joint -> Body -> Body
+rotate lockMode deg joint body =
     let isRotatee j = J.jointId j == J.jointId joint
         parent = getParent body (J.jointId joint)
         originalX = J.jointX joint
@@ -53,22 +55,18 @@ rotate body lockMode deg joint =
         dx = J.jointX rotated - originalX
         dy = J.jointY rotated - originalY
 
-        -- TODO: this whole juggling of nodes and values is bit convoluted
-
         -- Replace the original joint value
-        withJointRotated = T.replaceVal isRotatee rotated (root body)
+        body' = T.replaceVal isRotatee rotated (root body)
 
-        -- Find node of the rotated joint
-        rotatedJointNode = fromJust $ T.findBy isRotatee withJointRotated
+        -- Find node of the rotated joint in the new tree
+        rotatedJointNode = fromJust $ T.findBy isRotatee body'
 
-        -- Modify children
-        newChildrenTree = T.setChildren rotatedJointNode
+        -- Cascade effects of rotation onto children of the rotated joint
+        nodeWithUpdatedChildren = T.setChildren rotatedJointNode
             (rotateAdjustChild lockMode dx dy deg rotatedJointNode <$> T.children rotatedJointNode)
 
-        in body { root = T.replaceNode (isRotatee . T.val) newChildrenTree withJointRotated }
+        in body { root = T.replaceNode (isRotatee . T.val) nodeWithUpdatedChildren body' }
 
-
--- TODO: holy shit this is ugly
 rotateAdjustChild :: JointLockMode -> Double -> Double -> Double -> Tree Joint -> Tree Joint -> Tree Joint
 rotateAdjustChild lockMode dx dy deg parentNode jointNode =
     let parent = T.val parentNode
@@ -96,15 +94,31 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
             in  T.setChildren node children
 
 
+-- TODO: this can only really work on single selected joint
+rotateTowards :: JointLockMode -> Double -> Double -> Tree Joint -> Body -> Body
+rotateTowards lockMode x y jointNode body =
+    let joint = T.val jointNode
+        parent = getParent body (J.jointId joint)
+        (px, py) = (J.jointX parent, J.jointY parent)
+        (jx, jy) = (J.jointX joint, J.jointY joint)
+        a1 = angle px py jx jy
+        a2 = angle px py x y
+        delta = getDegrees $ a2 - a1
+    in rotate lockMode delta joint body
+
+
 addJoint :: Body -> Joint -> Joint -> Body
 addJoint body parent joint = body
     { root = T.insert joint (\j -> J.jointId j == J.jointId parent) (root body)
-    , parentLookup = Map.insert (J.jointId joint) parent (parentLookup body)
+    , parentLookup = Map.insert (J.jointId joint) (J.jointId parent) (parentLookup body)
     }
 
--- TODO: in theory, this is unsafe (`!` calls error when key doesn't exist)
+-- TODO:this is unsafe in more than one way. (`!` and `fromJust`)
 getParent :: Body -> JointId -> Joint
-getParent body jointId = parentLookup body ! jointId
+getParent body jointId =
+    let parentId = parentLookup body ! jointId
+        parentJoint = fromJust $ T.findBy (\j -> J.jointId j == parentId) (root body)
+        in T.val parentJoint
 
 jointPositions :: Body -> [(Double, Double)]
 jointPositions body =

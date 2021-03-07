@@ -3,6 +3,7 @@ module Render (render) where
 import qualified AppState             as ST
 import qualified Body                 as B
 import qualified Joint                as J
+import qualified JointSelect          as Sel
 
 import           Control.Monad.Reader (ReaderT, ask, asks, lift, runReaderT)
 import           Data.Bifunctor       (bimap)
@@ -96,11 +97,10 @@ renderJoint j = do
     st <- ask
     let scaleFactor = ST.viewScale st
 
-    let isJointSelected = ST.isSelected st (J.jointId j)
+    let isJointSelected = Sel.isSelected (J.jointId j) (ST.selectedJointIds st)
     let radius = fromIntegral (if isJointSelected then jointRadiusSelected else jointRadius) / scaleFactor
     let (x, y) = (J.jointX j, J.jointY j)
 
-    -- TODO: thin dashed line around selected joint
     lift $ do
         setSourceColor $ if isJointSelected then jointColorSelected else jointColor
         CR.arc x y radius 0 (pi * 2)

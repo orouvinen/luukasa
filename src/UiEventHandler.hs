@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLabels #-}
 {-
     Intermediate event handlers.
     These will act as a bridge from IO monad to pure code.
@@ -16,7 +17,8 @@
 module UiEventHandler where
 
 import           Data.IORef
-import           EventHandler  as E (Event (..), dispatchAction)
+import           EventHandler  as E (Event (..), SelectMode (..),
+                                     dispatchAction)
 import qualified GI.Gdk        as Gdk
 -- import qualified GI.Gdk.Objects as GO
 
@@ -36,9 +38,13 @@ canvasMouseButtonClick s e = do
 
     let dispatch = dispatchAction appState
 
+    eventState <- e `Gdk.get` #state
+    let ctrlPressed = Gdk.ModifierTypeControlMask `elem` eventState
+    let selectMode = if ctrlPressed then Toggle else Set
+
     let newState = case ST.actionState appState of
            ST.PlacingNewJoint -> dispatch $ E.CreateJoint x y
-           ST.Idle            -> dispatch $ E.TrySelect x y
+           ST.Idle            -> dispatch $ E.TrySelect x y selectMode
            _                  -> appState
 
     writeIORef s newState { ST.actionState = ST.Idle }
@@ -53,11 +59,13 @@ canvasKeyPress s eventKey = do
     -- print $ actionState appState
 
     let dispatch = dispatchAction appState
-    let debug = ST.printState appState
+    let debugJoints = ST.printJoints appState
+    let debugState = ST.printState appState
 
-    -- putStr $ case key of
-    --     Gdk.KEY_Q -> "DEBUG:  " ++ debug
-    --     _         -> ""
+    putStr $ case key of
+        Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
+        Gdk.KEY_2 -> "STATE: " ++ debugState
+        _         -> ""
 
     let newState = case key of
             Gdk.KEY_J       ->
@@ -65,8 +73,8 @@ canvasKeyPress s eventKey = do
                     then appState { ST.actionState = ST.PlacingNewJoint }
                     else appState -- TODO: notify about the need of joint selection prior to the command
 
-            Gdk.KEY_Up      -> dispatch $ E.Rotate 1 (-10)
-            Gdk.KEY_Down    -> dispatch $ E.Rotate 1 10
+            Gdk.KEY_Up      -> dispatch $ E.RotateSelected 10
+            Gdk.KEY_Down    -> dispatch $ E.RotateSelected (-10)
             _               -> appState
 
     writeIORef s newState

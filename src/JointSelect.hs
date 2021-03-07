@@ -1,4 +1,4 @@
-module JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocalBody) where
+module JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocalBody, toggle, isSelected) where
 
 import           AppState      (AppState, selectedJointIds)
 import qualified Body          as B
@@ -19,9 +19,18 @@ trySelectAt body x y =
         then Nothing
         else Just $ J.jointId $ head jointsNearEnough
 
+isSelected :: J.JointId -> [J.JointId] -> Bool
+isSelected = elem
 
-isSelected :: AppState -> J.JointId -> Bool
-isSelected state jointId = jointId `elem` selectedJointIds state
+toggle :: J.JointId -> [J.JointId] -> [J.JointId]
+toggle jointId selection =
+    let isSelected = jointId `elem` selection
+    in if isSelected
+        then filter (/= jointId) selection
+        else jointId : selection
+
+
+-- TODO: the below conversions surely don't belong in this module
 
 -- | Convert body to screen coordinates
 bodyToScreenCoordinates :: B.Body -> Double -> Double -> Double -> B.Body

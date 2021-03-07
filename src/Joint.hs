@@ -54,7 +54,3 @@ rotate deg parent rotatee =
         y = jointY parent + (jointR rotatee * sin (getRadians . rad $ worldRot))
     in
         rotatee { jointX = x, jointY = y, jointLocalRot = localRot, jointWorldRot = worldRot }
-
-
-
-

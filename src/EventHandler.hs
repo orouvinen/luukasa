@@ -1,18 +1,20 @@
-module EventHandler (Event(..), dispatchAction) where
+module EventHandler (Event(..), SelectMode(..), dispatchAction) where
 
 import qualified AppState      as ST
 import qualified Body          as B
-import           Data.Foldable (toList)
-import           Data.Maybe    (fromJust)
+import           Data.Foldable (foldl', toList)
+import           Data.Function ((&))
+import           Data.Maybe    (catMaybes, fromJust, mapMaybe)
 import qualified Joint         as J
-import           JointSelect
+import           JointSelect   as Sel
 import qualified Tree          as T
 import           Units         (Degrees, getDegrees)
 
+data SelectMode = Set | Toggle
 data Event
     = CreateJoint Int Int
-    | TrySelect Int Int
-    | Rotate J.JointId Double
+    | TrySelect Int Int SelectMode
+    | RotateSelected Double
 
 dispatchAction :: ST.AppState -> Event -> ST.AppState
 dispatchAction s e =
@@ -30,21 +32,28 @@ dispatchAction s e =
                 , ST.nextCreateJointId = newJointId + 1
                 }
 
-        TrySelect x y ->
+        TrySelect x y selectMode ->
             let translateX = fromIntegral . fst $ ST.viewTranslate s
                 translateY = fromIntegral . snd $ ST.viewTranslate s
                 bodyOnScreen = bodyToScreenCoordinates body (ST.viewScale s) translateX translateY
             in case trySelectAt bodyOnScreen x y of
-                Just jointId -> s { ST.selectedJointIds = [jointId]}
+                Just jointId ->
+                    let selectedJointIds = case selectMode of
+                                            Set -> [jointId]
+                                            Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
+                    in s { ST.selectedJointIds = selectedJointIds }
                 Nothing      -> s
 
-        Rotate jointId deg ->
-            let rotatedJointNode = T.findBy (\j -> J.jointId j == jointId) (B.root body)
-            in case rotatedJointNode of
-                Nothing -> s
-                Just node ->
-                    let joint = T.val node
-                    in s { ST.body = B.rotate body (ST.jointLockMode s) deg joint }
+        RotateSelected deg ->
+            let rotatees = T.val <$> mapMaybe
+                    (\jointId -> T.findBy (\j -> J.jointId j == jointId) (B.root body))
+                    (ST.selectedJointIds s)
+                rotateActions = [B.rotate (ST.jointLockMode s) deg j | j <- rotatees]
+            -- Nope, I don't think this is the meaning of "notational convenience" in the documentation for &.
+            -- I know it'd be more readable to write out the lambda for fold explicitly, but this is my hobby
+            -- project and I need to have some fun right now goddamnit.
+            -- (To clarify, you'd be looking at "(\x f -> f x)" in place of "&")
+            in s { ST.body = foldl' (&) body rotateActions }
 
 createJoint :: B.Body -> J.JointId -> J.JointId -> Double -> Double -> B.Body
 createJoint body parentJointId jointId x y =
