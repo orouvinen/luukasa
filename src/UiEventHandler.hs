@@ -17,17 +17,11 @@
 module UiEventHandler where
 
 import           Data.IORef
-import           EventHandler  as E (Event (..), SelectMode (..),
-                                     dispatchAction)
-import qualified GI.Gdk        as Gdk
+import           EventHandler as E (Event (..), SelectMode (..), dispatchAction)
+import qualified GI.Gdk       as Gdk
 -- import qualified GI.Gdk.Objects as GO
 
-import qualified AppState      as ST
-import qualified Body          as B
-import           Data.Foldable (toList)
-import           Data.Maybe    (fromJust)
-import qualified Joint         as J
-import qualified Tree          as T
+import qualified AppState     as ST
 
 canvasMouseButtonClick :: IORef ST.AppState -> Gdk.EventButton -> IO Bool
 canvasMouseButtonClick s e = do
@@ -38,13 +32,11 @@ canvasMouseButtonClick s e = do
 
     let dispatch = dispatchAction appState
 
-    eventState <- e `Gdk.get` #state
-    let ctrlPressed = Gdk.ModifierTypeControlMask `elem` eventState
-    let selectMode = if ctrlPressed then Toggle else Set
+    ctrlPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeControlMask)
 
     let newState = case ST.actionState appState of
            ST.PlacingNewJoint -> dispatch $ E.CreateJoint x y
-           ST.Idle            -> dispatch $ E.TrySelect x y selectMode
+           ST.Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
            _                  -> appState
 
     writeIORef s newState { ST.actionState = ST.Idle }

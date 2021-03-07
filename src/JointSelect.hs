@@ -1,6 +1,5 @@
 module JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocalBody, toggle, isSelected) where
 
-import           AppState      (AppState, selectedJointIds)
 import qualified Body          as B
 import           Calc
 import           Data.Foldable (toList)

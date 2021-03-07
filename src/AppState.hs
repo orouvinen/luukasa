@@ -42,10 +42,6 @@ initialState = AppState
 selectionSize :: AppState -> Int
 selectionSize = length . selectedJointIds
 
--- isSelected :: AppState -> JointId -> Bool
--- isSelected s id = id `elem` selectedJointIds s
-
-
 printJoints :: AppState -> String
 printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root (body s)
 

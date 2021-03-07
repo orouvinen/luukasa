@@ -11,7 +11,6 @@ import           Data.Foldable        (toList)
 import           Data.IORef
 
 import           GI.Cairo.Render      as CR hiding (x, y)
-import qualified GI.Gtk               as Gtk
 
 data Color = Color { r :: Double, g :: Double, b :: Double }
 

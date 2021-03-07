@@ -82,11 +82,8 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
             in T.setChildren node children
 
         Rotate ->
-            let parentX = J.jointX parent
-                parentY = J.jointY parent
-
-                -- Follow parent's rotation but restore local rotation as it has not changed
-                originalLocalRot = J.jointLocalRot joint
+            -- Follow parent's rotation but restore local rotation as it has not changed
+            let originalLocalRot = J.jointLocalRot joint
                 joint' = J.rotate deg parent joint
                 node = T.setVal jointNode joint' { J.jointLocalRot = originalLocalRot }
 
@@ -129,9 +126,10 @@ limbSegments body = segmentsToChildren $ root body
 
 segmentsToChildren :: Tree Joint -> [((Double, Double), (Double, Double))]
 segmentsToChildren from =
-    let f           = segmentBetween from
-        ownChildren = fmap f (T.children from)
-        restOfBody  = concatMap segmentsToChildren (T.children from)
+    let children = T.children from
+        segmentToChild = segmentBetween from
+        ownChildren = segmentToChild <$> children
+        restOfBody = concatMap segmentsToChildren children
     in
         ownChildren ++ restOfBody
 

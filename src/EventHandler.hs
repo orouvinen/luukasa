@@ -2,13 +2,12 @@ module EventHandler (Event(..), SelectMode(..), dispatchAction) where
 
 import qualified AppState      as ST
 import qualified Body          as B
-import           Data.Foldable (foldl', toList)
+import           Data.Foldable (foldl')
 import           Data.Function ((&))
-import           Data.Maybe    (catMaybes, fromJust, mapMaybe)
+import           Data.Maybe    (fromJust, mapMaybe)
 import qualified Joint         as J
 import           JointSelect   as Sel
 import qualified Tree          as T
-import           Units         (Degrees, getDegrees)
 
 data SelectMode = Set | Toggle
 data Event
