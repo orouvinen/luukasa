@@ -49,13 +49,23 @@ buildUi state = do
         return True
 
 
-    Gtk.widgetAddEvents canvas [Gdk.EventMaskButtonPressMask, Gdk.EventMaskScrollMask]
+    Gtk.widgetAddEvents canvas
+        [ Gdk.EventMaskButtonPressMask
+        , Gdk.EventMaskButtonReleaseMask
+        , Gdk.EventMaskPointerMotionMask
+        , Gdk.EventMaskPointerMotionHintMask
+        , Gdk.EventMaskScrollMask
+        ]
 
     _ <- Gtk.onWidgetButtonPressEvent canvas $ \ev -> do
         _ <- EV.canvasMouseButtonClick state ev
         Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         return True
 
+    _ <- Gtk.onWidgetButtonReleaseEvent canvas $ \ev -> do
+        result <- EV.canvasMouseButtonRelease state ev
+        Gtk.widgetQueueDraw canvas
+        return result
     {- KeyEvent handler directly on `window`:
 
     " To receive mouse events on a drawing area, you will need to enable them with Widget.addEvents.
@@ -71,6 +81,9 @@ buildUi state = do
         --Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         Gtk.widgetQueueDraw canvas
         return False
+
+    _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
+        EV.canvasMouseMotion state ev
 
     -- Put all the parts together
     Gtk.gridAttach grid canvas 0 1 1 1

@@ -16,14 +16,16 @@
 -}
 module UiEventHandler where
 
+import           Data.Function ((&))
 import           Data.IORef
-import           EventHandler as E (Event (..), SelectMode (..), dispatchAction)
-import qualified GI.Gdk       as Gdk
+import           EventHandler  as E (Event (..), SelectMode (..),
+                                     dispatchAction)
+import qualified GI.Gdk        as Gdk
 -- import qualified GI.Gdk.Objects as GO
 
-import qualified AppState     as ST
+import           AppState
 
-canvasMouseButtonClick :: IORef ST.AppState -> Gdk.EventButton -> IO Bool
+canvasMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO Bool
 canvasMouseButtonClick s e = do
     appState <- readIORef s
 
@@ -34,15 +36,25 @@ canvasMouseButtonClick s e = do
 
     ctrlPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeControlMask)
 
-    let newState = case ST.actionState appState of
-           ST.PlacingNewJoint -> dispatch $ E.CreateJoint x y
-           ST.Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
+    let newState = case actionState appState of
+           PlacingNewJoint -> dispatch $ E.CreateJoint x y
+           Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
            _                  -> appState
 
-    writeIORef s newState { ST.actionState = ST.Idle }
+    writeIORef s newState { actionState = Idle }
     return False
 
-canvasKeyPress :: IORef ST.AppState -> Gdk.EventKey -> IO Bool
+canvasMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO Bool
+canvasMouseButtonRelease s e = do
+    appState <- readIORef s
+
+    let newState = appState { actionState = Idle }
+
+    writeIORef s newState
+    return False
+
+
+canvasKeyPress :: IORef AppState -> Gdk.EventKey -> IO Bool
 canvasKeyPress s eventKey = do
     appState <- readIORef s
 
@@ -51,8 +63,8 @@ canvasKeyPress s eventKey = do
     -- print $ actionState appState
 
     let dispatch = dispatchAction appState
-    let debugJoints = ST.printJoints appState
-    let debugState = ST.printState appState
+    let debugJoints = printJoints appState
+    let debugState = printState appState
 
     putStr $ case key of
         Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
@@ -61,8 +73,8 @@ canvasKeyPress s eventKey = do
 
     let newState = case key of
             Gdk.KEY_J       ->
-                if ST.selectionSize appState == 1 -- Parent joint needs to be selected
-                    then appState { ST.actionState = ST.PlacingNewJoint }
+                if selectionSize appState == 1 -- Parent joint needs to be selected
+                    then appState { actionState = PlacingNewJoint }
                     else appState -- TODO: notify about the need of joint selection prior to the command
 
             Gdk.KEY_Up      -> dispatch $ E.RotateSelected 10
@@ -76,7 +88,7 @@ canvasKeyPress s eventKey = do
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
 
-canvasScrollWheel :: IORef ST.AppState -> Gdk.EventScroll -> IO Bool
+canvasScrollWheel :: IORef AppState -> Gdk.EventScroll -> IO Bool
 canvasScrollWheel s eventScroll = do
     appState <- readIORef s
     scrollDirection <- Gdk.getEventScrollDirection eventScroll
@@ -85,26 +97,54 @@ canvasScrollWheel s eventScroll = do
         then -scrollWheelScaleStep
         else scrollWheelScaleStep
 
-    let newState = appState { ST.viewScale = ST.viewScale appState + scaleChange }
+    let newState = appState { viewScale = viewScale appState + scaleChange }
     writeIORef s newState
 
     return False
 
+canvasMouseMotion :: IORef AppState -> Gdk.EventMotion -> IO Bool
+canvasMouseMotion s e = do
+    appState <- readIORef s
+    mouseBtnPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeButton1Mask)
 
-setViewScale :: IORef ST.AppState -> Double -> IO Bool
+    newState <- if not mouseBtnPressed
+        then return appState
+        else do
+            mouseX <- e `Gdk.get` #x
+            mouseY <- e `Gdk.get` #y
+
+            let dragState = if selectionSize appState == 0
+                then DragSelectionRect
+                else DragSelected (dragMode appState)
+
+            let action = case dragState of
+                    DragSelectionRect -> E.ExtendSelectionRect mouseX mouseY
+                    DragSelected DragMove -> E.MoveSelected mouseX mouseY
+                    -- Just a placeholder for now
+                    DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
+
+            return $
+                (E.dispatchAction appState action) { actionState = dragState }
+
+    -- print $ actionState appState
+    writeIORef s newState
+    return False
+
+
+setViewScale :: IORef AppState -> Double -> IO Bool
 setViewScale s scaleFactor = do
     state <- readIORef s
 
-    let newState = state { ST.viewScale = scaleFactor }
+    let newState = state { viewScale = scaleFactor }
 
     writeIORef s newState
     return False
 
-setViewTranslate :: IORef ST.AppState -> Int -> Int -> IO Bool
+setViewTranslate :: IORef AppState -> Int -> Int -> IO Bool
 setViewTranslate s trX trY = do
     state <- readIORef s
 
-    let newState = state { ST.viewTranslate = (trX, trY) }
+    let newState = state { viewTranslate = (trX, trY) }
 
     writeIORef s newState
     return False

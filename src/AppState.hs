@@ -9,11 +9,12 @@ import           Joint         (JointId, JointLockMode (..))
 data ActionState
     = Idle
     | PlacingNewJoint
-    | DragMove
-    | DragRotate
-    | DragSelection
+    | DragSelected DragMode
+    | DragSelectionRect
     | AnimationPlayBack
     deriving Show
+
+data DragMode = DragMove | DragRotate deriving Show
 
 data AppState = AppState
     { actionState       :: ActionState
@@ -24,6 +25,7 @@ data AppState = AppState
     , viewTranslate     :: (Int, Int)
     , selectedJointIds  :: [JointId]
     , jointLockMode     :: JointLockMode
+    , dragMode          :: DragMode
     } deriving (Show)
 
 
@@ -37,6 +39,7 @@ initialState = AppState
     , viewScale = 1
     , viewTranslate = (0, 0)
     , jointLockMode = Rotate
+    , dragMode = DragMove
     }
 
 selectionSize :: AppState -> Int

@@ -14,6 +14,9 @@ data Event
     = CreateJoint Int Int
     | TrySelect Int Int SelectMode
     | RotateSelected Double
+    | MoveSelected Double Double
+    | ExtendSelectionRect Double Double
+    | DragRotateSelected Double Double
 
 dispatchAction :: ST.AppState -> Event -> ST.AppState
 dispatchAction s e =
@@ -53,6 +56,12 @@ dispatchAction s e =
             -- project and I need to have some fun right now goddamnit.
             -- (To clarify, you'd be looking at "(\x f -> f x)" in place of "&")
             in s { ST.body = foldl' (&) body rotateActions }
+
+        MoveSelected x y -> s
+
+        ExtendSelectionRect x y -> s
+
+        DragRotateSelected x y -> s
 
 createJoint :: B.Body -> J.JointId -> J.JointId -> Double -> Double -> B.Body
 createJoint body parentJointId jointId x y =
