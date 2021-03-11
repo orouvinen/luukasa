@@ -83,7 +83,9 @@ buildUi state = do
         return False
 
     _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
-        EV.canvasMouseMotion state ev
+        result <- EV.canvasMouseMotion state ev
+        Gtk.widgetQueueDraw canvas
+        return result
 
     -- Put all the parts together
     Gtk.gridAttach grid canvas 0 1 1 1

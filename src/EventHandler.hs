@@ -48,16 +48,19 @@ dispatchAction s e =
 
         RotateSelected deg ->
             let rotatees = T.val <$> mapMaybe
-                    (\jointId -> T.findBy (\j -> J.jointId j == jointId) (B.root body))
+                    (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
                     (ST.selectedJointIds s)
-                rotateActions = [B.rotate (ST.jointLockMode s) deg j | j <- rotatees]
-            -- Nope, I don't think this is the meaning of "notational convenience" in the documentation for &.
-            -- I know it'd be more readable to write out the lambda for fold explicitly, but this is my hobby
-            -- project and I need to have some fun right now goddamnit.
-            -- (To clarify, you'd be looking at "(\x f -> f x)" in place of "&")
+                rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
             in s { ST.body = foldl' (&) body rotateActions }
 
-        MoveSelected x y -> s
+        MoveSelected x y ->
+            let translateX = fromIntegral . fst $ ST.viewTranslate s
+                translateY = fromIntegral . snd $ ST.viewTranslate s
+                (localX, localY) = Sel.screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
+
+                jointId = head $ ST.selectedJointIds s
+                joint = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
+                in s { ST.body = B.moveJoint localX localY joint body }
 
         ExtendSelectionRect x y -> s
 
@@ -65,7 +68,7 @@ dispatchAction s e =
 
 createJoint :: B.Body -> J.JointId -> J.JointId -> Double -> Double -> B.Body
 createJoint body parentJointId jointId x y =
-    let parent = T.val $ fromJust $ T.findBy (\j -> J.jointId j == parentJointId) (B.root body) -- TODO: something something meh fromJust something
+    let parent = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == parentJointId) (B.root body)
         newJoint =
             J.setChildAngleAndRadius
                 parent

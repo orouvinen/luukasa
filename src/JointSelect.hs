@@ -1,4 +1,4 @@
-module JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocalBody, toggle, isSelected) where
+module JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocal, screenToLocalBody, toggle, isSelected) where
 
 import qualified Body          as B
 import           Calc

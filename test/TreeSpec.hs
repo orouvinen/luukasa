@@ -36,7 +36,7 @@ Test tree:
         let finalTree = l3_child_2
 
         let deleteTestTree = l3_child_2
-        let replaceTestTree = T.replaceVal (== "L1 child1") "REPLACED" l3_child_2
+        let replaceTestTree = T.replaceValBy (== "L1 child1") "REPLACED" l3_child_2
 
         let noInsert = T.insert "nope" (== "invalidParent") l1_child_2
 
@@ -61,19 +61,19 @@ Test tree:
         describe "delete" $ do
             let res = T.delete (\x -> T.val x == "L2 child1") deleteTestTree
             it "deletes a node" $ do
-                T.findBy (== "L2 child1") res `shouldBe` Nothing
+                T.findNodeBy (== "L2 child1") res `shouldBe` Nothing
 
             it "deletes only one node" $ do
                 length res `shouldBe` length deleteTestTree - 1
 
             it "extends deleted node's parent's children with deleted node's children" $ do
-                let l1c1 = T.findBy (== "L1 child1") res
+                let l1c1 = T.findNodeBy (== "L1 child1") res
                 l1c1 `shouldSatisfy` isJust
                 length (T.children (fromJust l1c1)) `shouldBe` 2
 
-        describe "replaceVal" $ do
+        describe "replaceValBy" $ do
             it "replaces single node's value" $ do
-                let replacedNode = T.findBy (== "REPLACED") replaceTestTree
+                let replacedNode = T.findNodeBy (== "REPLACED") replaceTestTree
                 -- make sure there is the replaced node
                 replacedNode `shouldSatisfy` isJust
                 -- make sure size of tree didn't get affected

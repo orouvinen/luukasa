@@ -16,11 +16,9 @@
 -}
 module UiEventHandler where
 
-import           Data.Function ((&))
 import           Data.IORef
-import           EventHandler  as E (Event (..), SelectMode (..),
-                                     dispatchAction)
-import qualified GI.Gdk        as Gdk
+import           EventHandler as E (Event (..), SelectMode (..), dispatchAction)
+import qualified GI.Gdk       as Gdk
 -- import qualified GI.Gdk.Objects as GO
 
 import           AppState
@@ -105,9 +103,11 @@ canvasScrollWheel s eventScroll = do
 canvasMouseMotion :: IORef AppState -> Gdk.EventMotion -> IO Bool
 canvasMouseMotion s e = do
     appState <- readIORef s
+
     mouseBtnPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeButton1Mask)
 
-    newState <- if not mouseBtnPressed
+    -- for now, only allow dragging single selected joint
+    newState <- if not mouseBtnPressed || selectionSize appState /= 1
         then return appState
         else do
             mouseX <- e `Gdk.get` #x
