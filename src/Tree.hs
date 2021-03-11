@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor  #-}
-module Tree (Tree, val, children, create, insert, delete, findBy, replaceVal, replaceNode, setVal, setChildren) where
+module Tree (Tree, val, children, create, insert, replaceVal, delete, findNodeBy, findNode, replaceValBy, replaceNodeBy, replaceNode, setVal, setChildren, setChildValues) where
 
 import           Data.List  (find, intersperse)
 import           Data.Maybe (catMaybes)
@@ -37,6 +37,20 @@ setVal node x = node { _val = x }
 
 setChildren :: Tree a -> [Tree a] -> Tree a
 setChildren node xs = node { _children = xs }
+
+-- This is inefficient.
+-- TODO: just replace the values one by one. The hosting
+-- nodes needn't be guaranteed to stay the same.
+setChildValues :: Eq a => Tree a -> [a] -> Tree a
+setChildValues node xs =
+    let children' = foldl (\ns n ->
+            let matchingChild = find (== _val n) xs
+            in case matchingChild of
+                Nothing -> ns
+                Just x  -> n { _val = x } : ns)
+            [] (_children node)
+    in node { _children = children' }
+
 
 create :: a -> Tree a
 create x = Node
@@ -88,28 +102,45 @@ delete p root =
                 ownChildren = filter (/= toDelete) pChildren
             in root { _children = ownChildren ++ inheritedChildren}
 
--- Just for a little rabbit hole, continue with this:
--- replaceInTree :: (Tree a -> b) -> (b -> Bool) -> (Tree a -> Tree a) -> Tree a -> Tree a
--- replaceInTree get match set root =
-
--- TODO: these two replace functions look awfully alike
-replaceVal :: (a -> Bool) -> a -> Tree a -> Tree a
-replaceVal _ _ Empty = Empty
-replaceVal valueSelector newVal root
+replaceValBy :: (a -> Bool) -> a -> Tree a -> Tree a
+replaceValBy _ _ Empty = Empty
+replaceValBy valueSelector newVal root
     | valueSelector (_val root) = root { _val = newVal }
-    | otherwise = root { _children = replaceVal valueSelector newVal <$> _children root }
+    | otherwise = root { _children = replaceValBy valueSelector newVal <$> _children root }
 
-replaceNode :: (Tree a -> Bool) -> Tree a -> Tree a -> Tree a
-replaceNode nodeSelector newNode root
+replaceNodeBy :: (Tree a -> Bool) -> Tree a -> Tree a -> Tree a
+replaceNodeBy nodeSelector newNode root
     | nodeSelector root = newNode
-    | otherwise = root { _children = replaceNode nodeSelector newNode <$> _children root }
+    | otherwise = root { _children = replaceNodeBy nodeSelector newNode <$> _children root }
 
-findBy :: (a -> Bool) -> Tree a -> Maybe (Tree a)
-findBy p root
+replaceNode :: Tree a -> Tree a -> Tree a -> Tree a
+replaceNode old new root
+    | root == old = new
+    | otherwise = root { _children = replaceNode old new <$> _children root }
+
+replaceVal :: Eq a => a -> a -> Tree a -> Tree a
+replaceVal old new root
+    | null root = Empty
+    | _val root == old = root { _val = new }
+    | otherwise = root { _children = replaceVal old new <$> _children root }
+
+findNode :: Eq a => a -> Tree a -> Maybe (Tree a)
+findNode x root
+    | null root     = Nothing
+    | x == val root = Just root
+    | otherwise     =
+        let matches = catMaybes $ findNode x <$> _children root
+        in if null matches
+            then Nothing
+            else Just $ head matches
+
+
+findNodeBy :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+findNodeBy p root
     | null root         = Nothing
     | p (_val root)     = Just root
     | otherwise         =
-        let matches = catMaybes $ findBy p <$> _children root
+        let matches = catMaybes $ findNodeBy p <$> _children root
         in if null matches
             then Nothing
             else Just $ head matches

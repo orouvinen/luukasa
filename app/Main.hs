@@ -83,7 +83,9 @@ buildUi state = do
         return False
 
     _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
-        EV.canvasMouseMotion state ev
+        result <- EV.canvasMouseMotion state ev
+        Gtk.widgetQueueDraw canvas
+        return result
 
     -- Put all the parts together
     Gtk.gridAttach grid canvas 0 1 1 1
@@ -98,7 +100,7 @@ buildUi state = do
     -}
     width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
     height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
-    _ <- EV.setViewTranslate state (width' `div` 2) (height' `div` 2)
+    _ <- EV.setViewTranslate state (width' / 2) (height' / 2)
 
     return ()
 

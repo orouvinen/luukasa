@@ -32,7 +32,7 @@ Used to keep joint's geometric relation to its parent in check
 after rotating or translating the parent joint.
 -}
 setChildAngleAndRadius
-    :: Joint    -- ^ Parent. Position of parent would have been changed.
+    :: Joint    -- ^ Parent
     -> Joint    -- ^ Child to be updated.
     -> Joint
 setChildAngleAndRadius parent child =

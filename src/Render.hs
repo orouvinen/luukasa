@@ -49,9 +49,12 @@ render state = do
 
 doRender :: ReaderT ST.AppState Render ()
 doRender = do
-    body' <- asks ST.body
-    viewScale' <- asks ST.viewScale
-    viewTranslate' <- asks ST.viewTranslate
+    s <- ask
+
+    let body' = ST.body s
+    let viewScale = ST.viewScale s
+    let translateX = ST.translateX s
+    let translateY = ST.translateY s
     let limbs = B.limbSegments body'
     let joints = toList (B.root body')
 
@@ -60,23 +63,14 @@ doRender = do
         CR.paint
 
     mapM_ (\seg -> do
-            lift CR.save >> doRenderTranslate viewTranslate' >> doRenderScale viewScale'
+            lift (CR.save >> CR.translate translateX translateY >> CR.scale viewScale viewScale)
             renderLimb seg limbColor >> lift CR.restore)
         limbs
 
     mapM_ (\j -> do
-            lift CR.save >> doRenderTranslate viewTranslate' >> doRenderScale viewScale'
+            lift (CR.save >> CR.translate translateX translateY >> CR.scale viewScale viewScale)
             renderJoint j >> lift CR.restore)
         joints
-
-doRenderTranslate :: (Int, Int) -> ReaderT ST.AppState Render ()
-doRenderTranslate tr = do
-    let (x, y) = bimap fromIntegral fromIntegral tr
-    lift $ CR.translate x y
-
-doRenderScale :: Double -> ReaderT ST.AppState Render ()
-doRenderScale scaleFactor =
-    lift $ CR.scale scaleFactor scaleFactor
 
 renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AppState Render ()
 renderLimb limb color = do

@@ -1,19 +1,18 @@
-module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotate, addJoint) where
+module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint) where
 
 import           Data.Function ((&))
 import           Data.List
 
-import           Calc
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
-import           Data.Maybe    (fromJust)
+import           Data.Maybe    (fromJust, isNothing)
 import           Joint         (Joint (..), JointId, JointLockMode (..))
 import qualified Joint         as J
 import           Tree          (Tree)
-import qualified Tree          as T (children, create, findBy, insert,
-                                     replaceNode, replaceVal, setChildren,
-                                     setVal, val)
-import           Units
+import qualified Tree          as T (children, create, findNode, findNodeBy,
+                                     insert, replaceNode, replaceNodeBy,
+                                     replaceVal, replaceValBy, setChildValues,
+                                     setChildren, setVal, val)
 
 rootJointId :: JointId
 rootJointId = 0
@@ -43,8 +42,8 @@ create =
         }
 
 
-rotate :: JointLockMode -> Double -> Joint -> Body -> Body
-rotate lockMode deg joint body =
+rotateJoint :: JointLockMode -> Double -> Joint -> Body -> Body
+rotateJoint lockMode deg joint body =
     let isRotatee j = J.jointId j == J.jointId joint
         parent = getParent body (J.jointId joint)
         originalX = J.jointX joint
@@ -56,16 +55,15 @@ rotate lockMode deg joint body =
         dy = J.jointY rotated - originalY
 
         -- Replace the original joint value
-        body' = T.replaceVal isRotatee rotated (root body)
+        root' = T.replaceVal joint rotated (root body)
 
-        -- Find node of the rotated joint in the new tree
-        rotatedJointNode = fromJust $ T.findBy isRotatee body'
+        rotatedJointNode = fromJust $ T.findNode joint root'
 
         -- Cascade effects of rotation onto children of the rotated joint
         nodeWithUpdatedChildren = T.setChildren rotatedJointNode
             (rotateAdjustChild lockMode dx dy deg rotatedJointNode <$> T.children rotatedJointNode)
 
-        in body { root = T.replaceNode (isRotatee . T.val) nodeWithUpdatedChildren body' }
+        in body { root = T.replaceNode rotatedJointNode nodeWithUpdatedChildren root' }
 
 rotateAdjustChild :: JointLockMode -> Double -> Double -> Double -> Tree Joint -> Tree Joint -> Tree Joint
 rotateAdjustChild lockMode dx dy deg parentNode jointNode =
@@ -91,18 +89,31 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
             in  T.setChildren node children
 
 
--- TODO: this can only really work on single selected joint
-rotateTowards :: JointLockMode -> Double -> Double -> Tree Joint -> Body -> Body
-rotateTowards lockMode x y jointNode body =
-    let joint = T.val jointNode
-        parent = getParent body (J.jointId joint)
-        (px, py) = (J.jointX parent, J.jointY parent)
-        (jx, jy) = (J.jointX joint, J.jointY joint)
-        a1 = angle px py jx jy
-        a2 = angle px py x y
-        delta = getDegrees $ a2 - a1
-    in rotate lockMode delta joint body
+moveJoint :: Double -> Double -> Joint -> Body -> Body
+moveJoint x y joint body =
+    let parent = getParent body (J.jointId joint)
+        jointNode = fromJust $ T.findNode joint (root body)
+        children = T.children jointNode
 
+        translatedJoint = joint { J.jointX = x, J.jointY = y }
+        newJoint = if isRoot body joint
+                   then translatedJoint
+                   else J.setChildAngleAndRadius parent translatedJoint
+
+        updatedChildren = J.setChildAngleAndRadius newJoint <$> (T.val <$> children)
+        nodeWithUpdatedChildren = T.setChildValues jointNode updatedChildren
+        root' = T.replaceNodeBy (\n -> J.jointId (T.val n) == J.jointId joint) nodeWithUpdatedChildren (root body)
+
+    in body
+        { root = T.replaceValBy
+                    (\j -> J.jointId j == J.jointId joint)
+                    newJoint
+                    root'
+        }
+
+
+isRoot :: Body -> Joint -> Bool
+isRoot body joint = isNothing $ Map.lookup (J.jointId joint) (parentLookup body)
 
 addJoint :: Body -> Joint -> Joint -> Body
 addJoint body parent joint = body
@@ -114,7 +125,7 @@ addJoint body parent joint = body
 getParent :: Body -> JointId -> Joint
 getParent body jointId =
     let parentId = parentLookup body ! jointId
-        parentJoint = fromJust $ T.findBy (\j -> J.jointId j == parentId) (root body)
+        parentJoint = fromJust $ T.findNodeBy (\j -> J.jointId j == parentId) (root body)
         in T.val parentJoint
 
 jointPositions :: Body -> [(Double, Double)]
