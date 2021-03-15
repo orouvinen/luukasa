@@ -3,7 +3,6 @@ module EventHandler (Event(..), SelectMode(..), dispatchAction) where
 import qualified AppState      as ST
 import qualified Body          as B
 import           Data.Foldable (foldl')
-import           Data.Function ((&))
 import           Data.Maybe    (fromJust, mapMaybe)
 import qualified Joint         as J
 import           JointSelect   as Sel
@@ -25,8 +24,8 @@ dispatchAction s e =
         CreateJoint x y ->
             let newJointId = ST.nextCreateJointId s
                 parentJointId = head $ ST.selectedJointIds s
-                translateX = fromIntegral . fst $ ST.viewTranslate s
-                translateY = fromIntegral . snd $ ST.viewTranslate s
+                translateX = ST.translateX s
+                translateY = ST.translateY s
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
             in
                 s
@@ -35,8 +34,8 @@ dispatchAction s e =
                 }
 
         TrySelect x y selectMode ->
-            let translateX = fromIntegral . fst $ ST.viewTranslate s
-                translateY = fromIntegral . snd $ ST.viewTranslate s
+            let translateX = ST.translateX s
+                translateY = ST.translateY s
                 bodyOnScreen = bodyToScreenCoordinates body (ST.viewScale s) translateX translateY
             in case trySelectAt bodyOnScreen x y of
                 Just jointId ->
@@ -51,11 +50,11 @@ dispatchAction s e =
                     (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
                     (ST.selectedJointIds s)
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
-            in s { ST.body = foldl' (&) body rotateActions }
+            in s { ST.body = foldl' (\body rotateNext -> rotateNext body) body rotateActions }
 
         MoveSelected x y ->
-            let translateX = fromIntegral . fst $ ST.viewTranslate s
-                translateY = fromIntegral . snd $ ST.viewTranslate s
+            let translateX = ST.translateX s
+                translateY = ST.translateY s
                 (localX, localY) = Sel.screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
 
                 jointId = head $ ST.selectedJointIds s

@@ -22,7 +22,8 @@ data AppState = AppState
     , nextCreateJointId :: Int
     , fileName          :: Maybe T.Text
     , viewScale         :: Double
-    , viewTranslate     :: (Int, Int)
+    , translateX        :: Double
+    , translateY        :: Double
     , selectedJointIds  :: [JointId]
     , jointLockMode     :: JointLockMode
     , dragMode          :: DragMode
@@ -37,7 +38,8 @@ initialState = AppState
     , selectedJointIds = []
     , fileName = Nothing
     , viewScale = 1
-    , viewTranslate = (0, 0)
+    , translateX = 0
+    , translateY = 0
     , jointLockMode = Rotate
     , dragMode = DragMove
     }

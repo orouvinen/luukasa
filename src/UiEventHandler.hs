@@ -140,11 +140,11 @@ setViewScale s scaleFactor = do
     writeIORef s newState
     return False
 
-setViewTranslate :: IORef AppState -> Int -> Int -> IO Bool
+setViewTranslate :: IORef AppState -> Double -> Double -> IO Bool
 setViewTranslate s trX trY = do
     state <- readIORef s
 
-    let newState = state { viewTranslate = (trX, trY) }
+    let newState = state { translateX = trX, translateY = trY }
 
     writeIORef s newState
     return False

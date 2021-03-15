@@ -37,7 +37,7 @@ bodyToScreenCoordinates body scaleFactor trX trY = body
     { B.root = fmap
         (\j ->
             let (screenX, screenY) =
-                    localToScreen scaleFactor (truncate trX) (truncate trY) (J.jointX j) (J.jointY j)
+                    localToScreen scaleFactor trX trY (J.jointX j) (J.jointY j)
             in j { J.jointX = fromIntegral . toInteger $ screenX
                  , J.jointY = fromIntegral . toInteger $ screenY
                  }
@@ -45,27 +45,27 @@ bodyToScreenCoordinates body scaleFactor trX trY = body
     }
 
 -- |Screen coordinates to local conversion, taking into account body translation
-screenToLocalBody :: B.Body -> Double -> Int -> Int -> Int -> Int -> (Double, Double)
+screenToLocalBody :: B.Body -> Double -> Double -> Double -> Int -> Int -> (Double, Double)
 screenToLocalBody body scaleFactor trX trY x y =
     screenToLocal scaleFactor trX trY (x + B.translateX body) (y + B.translateY body)
 
 -- |Local coordinates to screen conversion, taking into account body translation
-localToScreenBody :: B.Body -> Double -> Int -> Int -> Double -> Double -> (Int, Int)
+localToScreenBody :: B.Body -> Double -> Double -> Double -> Double -> Double -> (Int, Int)
 localToScreenBody body scaleFactor trX trY x y =
     let bodyTranslateX = fromIntegral $ B.translateX body
         bodyTranslateY = fromIntegral $ B.translateY body
     in localToScreen scaleFactor trX trY (x + bodyTranslateX) (y + bodyTranslateY)
 
 -- |Screen coordinates to local conversion
-screenToLocal :: Double -> Int -> Int -> Int -> Int -> (Double, Double)
+screenToLocal :: Double -> Double -> Double -> Int -> Int -> (Double, Double)
 screenToLocal scaleFactor trX trY x y =
-    let localX = fromIntegral (x - trX) / scaleFactor
-        localY = fromIntegral (y - trY) / scaleFactor
+    let localX = (fromIntegral x - trX) / scaleFactor
+        localY = (fromIntegral y - trY) / scaleFactor
     in (localX, localY)
 
 -- |Local coordinates to screen conversion
-localToScreen :: Double -> Int -> Int -> Double -> Double -> (Int, Int)
+localToScreen :: Double -> Double -> Double -> Double -> Double -> (Int, Int)
 localToScreen scaleFactor trX trY x y =
-    let screenX = (x * scaleFactor) + fromIntegral trX
-        screenY = (y * scaleFactor) + fromIntegral trY
+    let screenX = (x * scaleFactor) + trX
+        screenY = (y * scaleFactor) + trY
     in (truncate screenX, truncate screenY)

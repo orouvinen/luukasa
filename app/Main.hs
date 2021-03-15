@@ -100,7 +100,7 @@ buildUi state = do
     -}
     width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
     height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
-    _ <- EV.setViewTranslate state (width' `div` 2) (height' `div` 2)
+    _ <- EV.setViewTranslate state (width' / 2) (height' / 2)
 
     return ()
 
