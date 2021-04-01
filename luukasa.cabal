@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 466af810348524345988571428f0ce3cc5d476e8b112b26e57e5b6132f2ba215
+-- hash: 3c4f88c9402a20e627d19bb7f3d8c629cab6ccbc23f81218ecd1277865d91329
 
 name:           luukasa
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       Body
       Calc
       EventHandler
+      Frame
       Joint
       JointSelect
       Render
