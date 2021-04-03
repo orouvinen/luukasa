@@ -19,7 +19,7 @@ data Event
 
 dispatchAction :: ST.AppState -> Event -> ST.AppState
 dispatchAction s e =
-    let body = ST.body s
+    let body = ST.visibleBody s
     in case e of
         CreateJoint x y ->
             let newJointId = ST.nextCreateJointId s
@@ -27,11 +27,8 @@ dispatchAction s e =
                 translateX = ST.translateX s
                 translateY = ST.translateY s
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
-            in
-                s
-                { ST.body = createJoint body parentJointId newJointId localX localY
-                , ST.nextCreateJointId = newJointId + 1
-                }
+                body' = createJoint body parentJointId newJointId localX localY
+            in (ST.setVisibleBody s body') { ST.nextCreateJointId = newJointId + 1 }
 
         TrySelect x y selectMode ->
             let translateX = ST.translateX s
@@ -50,7 +47,8 @@ dispatchAction s e =
                     (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
                     (ST.selectedJointIds s)
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
-            in s { ST.body = foldl' (\body rotateNext -> rotateNext body) body rotateActions }
+                body' = foldl' (\body rotateNext -> rotateNext body) body rotateActions
+            in ST.setVisibleBody s body'
 
         MoveSelected x y ->
             let translateX = ST.translateX s
@@ -59,7 +57,8 @@ dispatchAction s e =
 
                 jointId = head $ ST.selectedJointIds s
                 joint = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
-                in s { ST.body = B.moveJoint localX localY joint body }
+                body' = B.moveJoint localX localY joint body
+                in ST.setVisibleBody s body'
 
         ExtendSelectionRect x y -> s
 

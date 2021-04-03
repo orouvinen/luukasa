@@ -1,5 +1,8 @@
 module AppState where
 
+import           Animation     (Animation)
+import qualified Animation     as A
+
 import           Body          (Body)
 import qualified Body          as B
 import           Data.Foldable (toList)
@@ -16,9 +19,15 @@ data ActionState
 
 data DragMode = DragMove | DragRotate deriving Show
 
+defaultFps :: Int
+defaultFps = 25
+
+initialAnimation :: Animation
+initialAnimation = A.appendFrame (A.mkAnimation defaultFps) B.create
+
 data AppState = AppState
     { actionState       :: ActionState
-    , body              :: Body
+    , animation         :: Animation
     , nextCreateJointId :: Int
     , fileName          :: Maybe T.Text
     , viewScale         :: Double
@@ -29,11 +38,10 @@ data AppState = AppState
     , dragMode          :: DragMode
     } deriving (Show)
 
-
 initialState :: AppState
 initialState = AppState
     { actionState = Idle
-    , body = B.create
+    , animation = initialAnimation
     , nextCreateJointId = B.rootJointId + 1
     , selectedJointIds = []
     , fileName = Nothing
@@ -47,8 +55,17 @@ initialState = AppState
 selectionSize :: AppState -> Int
 selectionSize = length . selectedJointIds
 
+visibleBody :: AppState -> Body
+visibleBody = A.currentFrameBody . animation
+
+setVisibleBody :: AppState -> Body -> AppState
+setVisibleBody s b =
+    s { animation = A.setCurrentFrameBody (animation s) b }
+
 printJoints :: AppState -> String
-printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root (body s)
+printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root body
+  where
+    body = A.currentFrameBody (animation s)
 
 printState :: AppState -> String
 printState s =

@@ -51,7 +51,7 @@ doRender :: ReaderT ST.AppState Render ()
 doRender = do
     s <- ask
 
-    let body' = ST.body s
+    let body' = ST.visibleBody s
     let viewScale = ST.viewScale s
     let translateX = ST.translateX s
     let translateY = ST.translateY s
