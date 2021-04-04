@@ -29,7 +29,6 @@ currentFrameBody animation =
     let frame = Seq.index (frames animation) (currentFrame animation)
     in F.body frame
 
-
 -- | Replace the active frame's body
 setCurrentFrameBody :: Animation -> Body -> Animation
 setCurrentFrameBody animation body =

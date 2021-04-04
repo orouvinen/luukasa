@@ -1,16 +1,19 @@
 module Render (render) where
 
-import qualified AppState             as ST
-import qualified Body                 as B
-import qualified Joint                as J
-import qualified JointSelect          as Sel
+import qualified AppState               as ST
+import qualified Body                   as B
+import qualified Joint                  as J
+import qualified JointSelect            as Sel
 
-import           Control.Monad.Reader (ReaderT, ask, asks, lift, runReaderT)
-import           Data.Bifunctor       (bimap)
-import           Data.Foldable        (toList)
+import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.Reader   (ReaderT, ask, asks, lift, runReaderT)
+import           Data.Bifunctor         (bimap)
+import           Data.Foldable          (toList)
 import           Data.IORef
 
-import           GI.Cairo.Render      as CR hiding (x, y)
+--import           GI.Cairo.Render      as CR hiding (x, y)
+import           GI.Cairo.Render        (Render)
+import qualified GI.Cairo.Render        as CR hiding (x, y)
 
 data Color = Color { r :: Double, g :: Double, b :: Double }
 
@@ -52,11 +55,10 @@ doRender = do
     s <- ask
 
     let body' = ST.visibleBody s
-    let viewScale = ST.viewScale s
-    let translateX = ST.translateX s
-    let translateY = ST.translateY s
-    let limbs = B.limbSegments body'
-    let joints = toList (B.root body')
+        viewScale = ST.viewScale s
+        (translateX, translateY) = (ST.translateX s, ST.translateY s)
+        limbs = B.limbSegments body'
+        joints = toList (B.root body')
 
     lift $ do
         setSourceColor bgColor
@@ -71,6 +73,12 @@ doRender = do
             lift (CR.save >> CR.translate translateX translateY >> CR.scale viewScale viewScale)
             renderJoint j >> lift CR.restore)
         joints
+
+    lift $ do
+        CR.setSourceRGB 1 1 1
+        CR.moveTo 0 10
+        CR.showText "Pöllö huhuu"
+        CR.stroke
 
 renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AppState Render ()
 renderLimb limb color = do
