@@ -27,7 +27,7 @@ dispatchAction s e =
                 translateX = ST.translateX s
                 translateY = ST.translateY s
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
-                body' = createJoint body parentJointId newJointId localX localY
+                body' = B.createJoint body parentJointId newJointId localX localY
             in (ST.setVisibleBody s body') { ST.nextCreateJointId = newJointId + 1 }
 
         TrySelect x y selectMode ->
@@ -63,19 +63,3 @@ dispatchAction s e =
         ExtendSelectionRect x y -> s
 
         DragRotateSelected x y -> s
-
-createJoint :: B.Body -> J.JointId -> J.JointId -> Double -> Double -> B.Body
-createJoint body parentJointId jointId x y =
-    let parent = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == parentJointId) (B.root body)
-        newJoint =
-            J.setChildAngleAndRadius
-                parent
-                (J.Joint
-                    { J.jointX = x
-                    , J.jointY = y
-                    , J.jointId = jointId
-                    , J.jointLocalRot = 0
-                    , J.jointWorldRot = 0
-                    , J.jointR = 0
-                    })
-    in B.addJoint body parent newJoint

@@ -1,4 +1,4 @@
-module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint) where
+module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint, createJoint) where
 
 import           Data.Function ((&))
 import           Data.List
@@ -149,3 +149,19 @@ segmentBetween from to = ((from & x, from & y), (to & x, to & y))
     where
         x = jointX . T.val
         y = jointY . T.val
+
+createJoint :: Body -> J.JointId -> J.JointId -> Double -> Double -> Body
+createJoint body parentJointId jointId x y =
+    let parent = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == parentJointId) (root body)
+        newJoint =
+            J.setChildAngleAndRadius
+                parent
+                (J.Joint
+                    { J.jointX = x
+                    , J.jointY = y
+                    , J.jointId = jointId
+                    , J.jointLocalRot = 0
+                    , J.jointWorldRot = 0
+                    , J.jointR = 0
+                    })
+    in addJoint body parent newJoint
