@@ -1,4 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Frame where
+import           Data.Text (Text)
+import qualified Data.Text as T
 
 import           Body
 data TimeCode = TimeCode
@@ -13,16 +17,24 @@ data Frame = Frame
     , body     :: Body
     }
 
--- TODO: zero pad components
+timeDigit :: Int -> String
+timeDigit x
+    | x < 10    = "0" ++ show x
+    | otherwise = show x
+
+frameDigit :: Int -> String
+frameDigit x
+    | x < 10    = "00" ++ show x
+    | otherwise = "0" ++ show x
+
 instance Show TimeCode where
-    show tc
-        = show (hour tc)
-        ++ ":"
-        ++ show (minute tc)
-        ++ ":"
-        ++ show (second tc)
-        ++ ":"
-        ++ show (frame tc)
+    show tc = timeDigit (hour tc)
+            ++ ":"
+            ++ timeDigit (minute tc)
+            ++ ":"
+            ++ timeDigit (second tc)
+            ++ ":"
+            ++ frameDigit (frame tc)
 
 mkFrame :: Int -> Int -> Body -> Frame
 mkFrame fps num body = Frame { num = num, body = body, timeCode = frameTimeCode num fps }

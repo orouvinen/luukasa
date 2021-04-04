@@ -1,7 +1,9 @@
 module Render (render) where
 
+import qualified Animation              as A
 import qualified AppState               as ST
 import qualified Body                   as B
+import qualified Frame                  as F
 import qualified Joint                  as J
 import qualified JointSelect            as Sel
 
@@ -74,10 +76,15 @@ doRender = do
             renderJoint j >> lift CR.restore)
         joints
 
+    renderTextInfo
+
+renderTextInfo :: ReaderT ST.AppState Render ()
+renderTextInfo = do
+    animation <- asks ST.animation
     lift $ do
         CR.setSourceRGB 1 1 1
         CR.moveTo 0 10
-        CR.showText "Pöllö huhuu"
+        CR.showText (A.currentTimeCode animation)
         CR.stroke
 
 renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AppState Render ()

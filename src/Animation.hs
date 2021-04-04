@@ -1,4 +1,4 @@
-module Animation (Animation, mkAnimation, appendFrame, currentFrameBody, setCurrentFrameBody) where
+module Animation (Animation, currentTimeCode, mkAnimation, appendFrame, currentFrameBody, setCurrentFrameBody) where
 
 import           Body          (Body)
 import           Data.Sequence (Seq, (<|), (><), (|>))
@@ -22,6 +22,10 @@ mkAnimation fps = Animation
     , currentFrame = 0 -- Frame numbers are 1-based (0 is not a valid frame number)
     , fps = fps
     }
+
+currentTimeCode :: Animation -> String
+currentTimeCode animation =
+    show $ F.timeCode $ Seq.index (frames animation) (currentFrame animation)
 
 -- | The current body that's is the object of edits & rendering
 currentFrameBody :: Animation -> Body

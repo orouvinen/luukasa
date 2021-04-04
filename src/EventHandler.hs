@@ -1,5 +1,6 @@
 module EventHandler (Event(..), SelectMode(..), dispatchAction) where
 
+import qualified Animation     as A
 import qualified AppState      as ST
 import qualified Body          as B
 import           Data.Foldable (foldl')
@@ -10,16 +11,20 @@ import qualified Tree          as T
 
 data SelectMode = Set | Toggle
 data Event
+    -- Joint operations
     = CreateJoint Int Int
     | TrySelect Int Int SelectMode
     | RotateSelected Double
     | MoveSelected Double Double
     | ExtendSelectionRect Double Double
     | DragRotateSelected Double Double
+    -- Animation
+    | CreateFrame
 
 dispatchAction :: ST.AppState -> Event -> ST.AppState
 dispatchAction s e =
-    let body = ST.visibleBody s
+    let animation = ST.animation s
+        body = A.currentFrameBody $ ST.animation s
     in case e of
         CreateJoint x y ->
             let newJointId = ST.nextCreateJointId s
@@ -28,7 +33,10 @@ dispatchAction s e =
                 translateY = ST.translateY s
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
                 body' = B.createJoint body parentJointId newJointId localX localY
-            in (ST.setVisibleBody s body') { ST.nextCreateJointId = newJointId + 1 }
+            in s
+                { ST.animation = A.setCurrentFrameBody animation body'
+                , ST.nextCreateJointId = newJointId + 1
+                }
 
         TrySelect x y selectMode ->
             let translateX = ST.translateX s
@@ -48,7 +56,7 @@ dispatchAction s e =
                     (ST.selectedJointIds s)
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
                 body' = foldl' (\body rotateNext -> rotateNext body) body rotateActions
-            in ST.setVisibleBody s body'
+            in s { ST.animation = A.setCurrentFrameBody animation body' }
 
         MoveSelected x y ->
             let translateX = ST.translateX s
@@ -58,8 +66,12 @@ dispatchAction s e =
                 jointId = head $ ST.selectedJointIds s
                 joint = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
                 body' = B.moveJoint localX localY joint body
-                in ST.setVisibleBody s body'
+            in s { ST.animation = A.setCurrentFrameBody animation body' }
 
         ExtendSelectionRect x y -> s
 
         DragRotateSelected x y -> s
+
+        CreateFrame ->
+            let body' = A.currentFrameBody animation
+            in s { ST.animation = A.appendFrame animation body' }
