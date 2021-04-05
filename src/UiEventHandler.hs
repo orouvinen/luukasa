@@ -24,36 +24,33 @@ import qualified GI.Gdk       as Gdk
 import qualified Animation    as A
 import           AppState
 
-canvasMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO Bool
+canvasMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO ()
 canvasMouseButtonClick s e = do
     appState <- readIORef s
 
     x <- truncate <$> Gdk.getEventButtonX e
     y <- truncate <$> Gdk.getEventButtonY e
 
-    let dispatch = dispatchAction appState
-
     ctrlPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeControlMask)
 
-    let newState = case actionState appState of
-           PlacingNewJoint -> dispatch $ E.CreateJoint x y
-           Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
-           _                  -> appState
+    let dispatch = dispatchAction appState
+        newState = case actionState appState of
+            PlacingNewJoint -> dispatch $ E.CreateJoint x y
+            Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
+            _                  -> appState
 
     writeIORef s newState { actionState = Idle }
-    return False
 
-canvasMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO Bool
+canvasMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO ()
 canvasMouseButtonRelease s e = do
     appState <- readIORef s
 
     let newState = appState { actionState = Idle }
 
     writeIORef s newState
-    return False
 
 
-canvasKeyPress :: IORef AppState -> Gdk.EventKey -> IO Bool
+canvasKeyPress :: IORef AppState -> Gdk.EventKey -> IO ()
 canvasKeyPress s eventKey = do
     appState <- readIORef s
 
@@ -62,8 +59,8 @@ canvasKeyPress s eventKey = do
     -- print $ actionState appState
 
     let dispatch = dispatchAction appState
-    let debugJoints = printJoints appState
-    let debugState = printState appState
+        debugJoints = printJoints appState
+        debugState = printState appState
 
     putStr $ case key of
         Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
@@ -85,27 +82,26 @@ canvasKeyPress s eventKey = do
             _                   -> appState
 
     writeIORef s newState
-    return False
 
 
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
 
-canvasScrollWheel :: IORef AppState -> Gdk.EventScroll -> IO Bool
+canvasScrollWheel :: IORef AppState -> Gdk.EventScroll -> IO ()
 canvasScrollWheel s eventScroll = do
     appState <- readIORef s
     scrollDirection <- Gdk.getEventScrollDirection eventScroll
 
-    let scaleChange = if scrollDirection == Gdk.ScrollDirectionDown
-        then -scrollWheelScaleStep
-        else scrollWheelScaleStep
+    let scaleChange =
+            if scrollDirection == Gdk.ScrollDirectionDown
+            then -scrollWheelScaleStep
+            else scrollWheelScaleStep
 
     let newState = appState { viewScale = viewScale appState + scaleChange }
     writeIORef s newState
 
-    return False
 
-canvasMouseMotion :: IORef AppState -> Gdk.EventMotion -> IO Bool
+canvasMouseMotion :: IORef AppState -> Gdk.EventMotion -> IO ()
 canvasMouseMotion s e = do
     appState <- readIORef s
 
@@ -133,24 +129,20 @@ canvasMouseMotion s e = do
 
     -- print $ actionState appState
     writeIORef s newState
-    return False
 
 
-setViewScale :: IORef AppState -> Double -> IO Bool
+setViewScale :: IORef AppState -> Double -> IO ()
 setViewScale s scaleFactor = do
     state <- readIORef s
 
     let newState = state { viewScale = scaleFactor }
 
     writeIORef s newState
-    return False
 
-setViewTranslate :: IORef AppState -> Double -> Double -> IO Bool
+setViewTranslate :: IORef AppState -> Double -> Double -> IO ()
 setViewTranslate s trX trY = do
     state <- readIORef s
 
     let newState = state { translateX = trX, translateY = trY }
 
     writeIORef s newState
-    return False
-
