@@ -21,6 +21,7 @@ import           EventHandler as E (Event (..), SelectMode (..), dispatchAction)
 import qualified GI.Gdk       as Gdk
 -- import qualified GI.Gdk.Objects as GO
 
+import qualified Animation    as A
 import           AppState
 
 canvasMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO Bool
@@ -75,9 +76,13 @@ canvasKeyPress s eventKey = do
                     then appState { actionState = PlacingNewJoint }
                     else appState -- TODO: notify about the need of joint selection prior to the command
 
-            Gdk.KEY_Up      -> dispatch $ E.RotateSelected 10
-            Gdk.KEY_Down    -> dispatch $ E.RotateSelected (-10)
-            _               -> appState
+            Gdk.KEY_Up          -> dispatch $ E.RotateSelected 10
+            Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-10)
+            Gdk.KEY_KP_Add      -> dispatch E.CreateFrame
+            Gdk.KEY_KP_Subtract -> dispatch E.DeleteFrame
+            Gdk.KEY_Left        -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) - 1
+            Gdk.KEY_Right       -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) + 1
+            _                   -> appState
 
     writeIORef s newState
     return False

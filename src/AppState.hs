@@ -20,7 +20,7 @@ data ActionState
 data DragMode = DragMove | DragRotate deriving Show
 
 defaultFps :: Int
-defaultFps = 25
+defaultFps = 24
 
 initialAnimation :: Animation
 initialAnimation = A.appendFrame (A.mkAnimation defaultFps) B.create

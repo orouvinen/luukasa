@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 90d18d2fcd570d674da9c3771462526df435ab7009b986728b79cc4605f5ab91
+-- hash: d0a1888de33c29d38507c82847314c4d20e924f3a74523e18f95857ec0fd5adb
 
 name:           luukasa
 version:        0.1.0.0
@@ -83,7 +83,9 @@ test-suite luukasa-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      AnimationSpec
       BodySpec
+      FrameSpec
       TreeSpec
       Paths_luukasa
   hs-source-dirs:

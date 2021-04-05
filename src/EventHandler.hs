@@ -20,6 +20,8 @@ data Event
     | DragRotateSelected Double Double
     -- Animation
     | CreateFrame
+    | DeleteFrame
+    | ShowFrame Int
 
 dispatchAction :: ST.AppState -> Event -> ST.AppState
 dispatchAction s e =
@@ -75,3 +77,7 @@ dispatchAction s e =
         CreateFrame ->
             let body' = A.currentFrameBody animation
             in s { ST.animation = A.appendFrame animation body' }
+
+        DeleteFrame -> s
+
+        ShowFrame frameNum -> s { ST.animation = A.setCurrentFrame animation frameNum }
