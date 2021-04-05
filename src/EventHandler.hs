@@ -1,10 +1,12 @@
-module EventHandler (Event(..), SelectMode(..), dispatchAction) where
+{-# LANGUAGE OverloadedStrings #-}
+module EventHandler (Event(..), SelectMode(..), dispatchAction, ErrorMessage) where
 
 import qualified Animation     as A
 import qualified AppState      as ST
 import qualified Body          as B
 import           Data.Foldable (foldl')
 import           Data.Maybe    (fromJust, mapMaybe)
+import qualified Data.Text     as T
 import qualified Joint         as J
 import           JointSelect   as Sel
 import qualified Tree          as T
@@ -23,7 +25,9 @@ data Event
     | DeleteFrame
     | ShowFrame Int
 
-dispatchAction :: ST.AppState -> Event -> ST.AppState
+type ErrorMessage = T.Text
+
+dispatchAction :: ST.AppState -> Event -> Either ErrorMessage ST.AppState
 dispatchAction s e =
     let animation = ST.animation s
         body = A.currentFrameBody $ ST.animation s
@@ -35,7 +39,7 @@ dispatchAction s e =
                 translateY = ST.translateY s
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
                 body' = B.createJoint body parentJointId newJointId localX localY
-            in s
+            in Right s
                 { ST.animation = A.setCurrentFrameBody animation body'
                 , ST.nextCreateJointId = newJointId + 1
                 }
@@ -49,8 +53,8 @@ dispatchAction s e =
                     let selectedJointIds = case selectMode of
                                             Set -> [jointId]
                                             Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
-                    in s { ST.selectedJointIds = selectedJointIds }
-                Nothing      -> s
+                    in Right s { ST.selectedJointIds = selectedJointIds }
+                Nothing      -> Right s -- TODO
 
         RotateSelected deg ->
             let rotatees = T.val <$> mapMaybe
@@ -58,7 +62,7 @@ dispatchAction s e =
                     (ST.selectedJointIds s)
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
                 body' = foldl' (\body rotateNext -> rotateNext body) body rotateActions
-            in s { ST.animation = A.setCurrentFrameBody animation body' }
+            in Right s { ST.animation = A.setCurrentFrameBody animation body' }
 
         MoveSelected x y ->
             let translateX = ST.translateX s
@@ -66,18 +70,21 @@ dispatchAction s e =
                 (localX, localY) = Sel.screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
 
                 jointId = head $ ST.selectedJointIds s
-                joint = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
-                body' = B.moveJoint localX localY joint body
-            in s { ST.animation = A.setCurrentFrameBody animation body' }
+                joint = T.val <$> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
+            in case joint of
+                Nothing     -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
+                Just joint  ->
+                    let body' = B.moveJoint localX localY joint body
+                    in Right s { ST.animation = A.setCurrentFrameBody animation body' }
 
-        ExtendSelectionRect x y -> s
+        ExtendSelectionRect x y -> Right s
 
-        DragRotateSelected x y -> s
+        DragRotateSelected x y -> Right s
 
         CreateFrame ->
             let body' = A.currentFrameBody animation
-            in s { ST.animation = A.appendFrame animation body' }
+            in Right s { ST.animation = A.appendFrame animation body' }
 
-        DeleteFrame -> s
+        DeleteFrame -> Right s
 
-        ShowFrame frameNum -> s { ST.animation = A.setCurrentFrame animation frameNum }
+        ShowFrame frameNum -> Right s { ST.animation = A.setCurrentFrame animation frameNum }

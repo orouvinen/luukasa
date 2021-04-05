@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedLabels  #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-
     Intermediate event handlers.
     These will act as a bridge from IO monad to pure code.
@@ -22,7 +23,13 @@ import qualified GI.Gdk       as Gdk
 -- import qualified GI.Gdk.Objects as GO
 
 import qualified Animation    as A
-import           AppState
+import           AppState     as ST
+
+handleResult :: Show a => IORef AppState -> Either a AppState -> IO ()
+handleResult stateRef result =
+    case result of
+        Left err       -> print err
+        Right newState -> writeIORef stateRef newState
 
 canvasMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO ()
 canvasMouseButtonClick s e = do
@@ -34,12 +41,13 @@ canvasMouseButtonClick s e = do
     ctrlPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeControlMask)
 
     let dispatch = dispatchAction appState
-        newState = case actionState appState of
+        receive = handleResult s
+        result = case actionState appState of
             PlacingNewJoint -> dispatch $ E.CreateJoint x y
             Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
-            _                  -> appState
+            _               -> Right appState
 
-    writeIORef s newState { actionState = Idle }
+    receive result
 
 canvasMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO ()
 canvasMouseButtonRelease s e = do
@@ -59,6 +67,7 @@ canvasKeyPress s eventKey = do
     -- print $ actionState appState
 
     let dispatch = dispatchAction appState
+        receive = handleResult s
         debugJoints = printJoints appState
         debugState = printState appState
 
@@ -67,11 +76,11 @@ canvasKeyPress s eventKey = do
         Gdk.KEY_2 -> "STATE: " ++ debugState
         _         -> ""
 
-    let newState = case key of
+    let result = case key of
             Gdk.KEY_J       ->
                 if selectionSize appState == 1 -- Parent joint needs to be selected
-                    then appState { actionState = PlacingNewJoint }
-                    else appState -- TODO: notify about the need of joint selection prior to the command
+                    then Right appState { actionState = PlacingNewJoint }
+                    else Left "No joint selected" -- TODO: this is not the kind of error we're looking for
 
             Gdk.KEY_Up          -> dispatch $ E.RotateSelected 10
             Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-10)
@@ -79,10 +88,9 @@ canvasKeyPress s eventKey = do
             Gdk.KEY_KP_Subtract -> dispatch E.DeleteFrame
             Gdk.KEY_Left        -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) - 1
             Gdk.KEY_Right       -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) + 1
-            _                   -> appState
+            _                   -> Right appState
 
-    writeIORef s newState
-
+    receive result
 
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
@@ -107,29 +115,27 @@ canvasMouseMotion s e = do
 
     mouseBtnPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeButton1Mask)
 
-    -- for now, only allow dragging single selected joint
-    newState <- if not mouseBtnPressed || selectionSize appState /= 1
-        then return appState
+    let receive = handleResult s
+
+    if not mouseBtnPressed || selectionSize appState /= 1
+        then return ()
         else do
             mouseX <- e `Gdk.get` #x
             mouseY <- e `Gdk.get` #y
 
-            let dragState = if selectionSize appState == 0
-                then DragSelectionRect
-                else DragSelected (dragMode appState)
+            let dragState =
+                    if selectionSize appState == 0
+                        then DragSelectionRect
+                        else DragSelected (dragMode appState)
 
-            let action = case dragState of
+                action = case dragState of
                     DragSelectionRect -> E.ExtendSelectionRect mouseX mouseY
                     DragSelected DragMove -> E.MoveSelected mouseX mouseY
                     -- Just a placeholder for now
                     DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
-            return $
-                (E.dispatchAction appState action) { actionState = dragState }
-
-    -- print $ actionState appState
-    writeIORef s newState
-
+            let result = E.dispatchAction appState { actionState = dragState } action
+            receive result
 
 setViewScale :: IORef AppState -> Double -> IO ()
 setViewScale s scaleFactor = do
