@@ -13,7 +13,6 @@ import           Data.Bifunctor         (bimap)
 import           Data.Foldable          (toList)
 import           Data.IORef
 
---import           GI.Cairo.Render      as CR hiding (x, y)
 import           GI.Cairo.Render        (Render)
 import qualified GI.Cairo.Render        as CR hiding (x, y)
 

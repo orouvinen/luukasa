@@ -7,7 +7,6 @@ import qualified Data.Text as T
 import           Body
 data Frame = Frame
     { num  :: Int
-    -- , timeCode :: TimeCode
     , body :: Body
     }
 

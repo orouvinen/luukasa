@@ -32,7 +32,6 @@ data TimeCode = TimeCode
     , frame  :: Int
     }
 
--- A dummy instance at this point
 instance Show Animation where
     show a = "FPS: " ++ show (_fps a) ++ " frm:" ++ show (_currentFrame a)
 instance Show TimeCode where
@@ -53,7 +52,7 @@ instance Show TimeCode where
 mkAnimation :: Int -> Animation
 mkAnimation fps = Animation
     { _frames = Seq.Empty
-    , _currentFrame = 0 -- Frame numbers are 1-based (0 is not a valid frame number)
+    , _currentFrame = 0
     , _fps = fps
     }
 
@@ -82,9 +81,9 @@ frameTimeCode fps num =
         minutes' = totalMinutes `mod` 60
         seconds' = totalSeconds `mod` 60
         frame' = (num `mod` fps) + 1
-    in TimeCode { hour = hours', minute = minutes', second = seconds', frame = frame' }
+    in TimeCode hours' minutes' seconds' frame'
 
--- | The current body that's is the object of edits & rendering
+-- | The current body that's the object of edits & rendering
 currentFrameBody :: Animation -> Body
 currentFrameBody animation =
     let frame = Seq.index (_frames animation) (_currentFrame animation)
