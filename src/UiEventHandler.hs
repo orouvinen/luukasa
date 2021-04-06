@@ -25,8 +25,8 @@ import qualified GI.Gdk       as Gdk
 import qualified Animation    as A
 import           AppState     as ST
 
-handleResult :: Show a => IORef AppState -> Either a AppState -> IO ()
-handleResult stateRef result =
+updateAppState :: Show a => IORef AppState -> Either a AppState -> IO ()
+updateAppState stateRef result =
     case result of
         Left err       -> print err
         Right newState -> writeIORef stateRef newState
@@ -41,13 +41,13 @@ canvasMouseButtonClick s e = do
     ctrlPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeControlMask)
 
     let dispatch = dispatchAction appState
-        receive = handleResult s
+        applyResult = updateAppState s
         result = case actionState appState of
             PlacingNewJoint -> dispatch $ E.CreateJoint x y
             Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
             _               -> Right appState
 
-    receive result
+    applyResult result
 
 canvasMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO ()
 canvasMouseButtonRelease s e = do
@@ -67,7 +67,7 @@ canvasKeyPress s eventKey = do
     -- print $ actionState appState
 
     let dispatch = dispatchAction appState
-        receive = handleResult s
+        applyResult = updateAppState s
         debugJoints = printJoints appState
         debugState = printState appState
 
@@ -90,7 +90,7 @@ canvasKeyPress s eventKey = do
             Gdk.KEY_Right       -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) + 1
             _                   -> Right appState
 
-    receive result
+    applyResult result
 
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
@@ -115,7 +115,7 @@ canvasMouseMotion s e = do
 
     mouseBtnPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeButton1Mask)
 
-    let receive = handleResult s
+    let applyResult = updateAppState s
 
     if not mouseBtnPressed || selectionSize appState /= 1
         then return ()
@@ -135,7 +135,7 @@ canvasMouseMotion s e = do
                     DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
             let result = E.dispatchAction appState { actionState = dragState } action
-            receive result
+            applyResult result
 
 setViewScale :: IORef AppState -> Double -> IO ()
 setViewScale s scaleFactor = do
