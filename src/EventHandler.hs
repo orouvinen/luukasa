@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module EventHandler (Event(..), SelectMode(..), dispatchAction, ErrorMessage) where
 
+import           Animation     (FrameNum)
 import qualified Animation     as A
 import qualified AppState      as ST
 import qualified Body          as B
@@ -23,7 +24,7 @@ data Event
     -- Animation
     | CreateFrame
     | DeleteFrame
-    | ShowFrame Int
+    | ShowFrame FrameNum
 
 type ErrorMessage = T.Text
 
@@ -81,10 +82,16 @@ dispatchAction s e =
 
         DragRotateSelected x y -> Right s
 
-        CreateFrame ->
-            let body' = A.currentFrameBody animation
-            in Right s { ST.animation = A.appendFrame animation body' }
+        CreateFrame -> Right s { ST.animation = A.appendFrame animation body }
 
-        DeleteFrame -> Right s
+        DeleteFrame -> Right s { ST.animation = A.deleteCurrentFrame animation }
 
         ShowFrame frameNum -> Right s { ST.animation = A.setCurrentFrame animation frameNum }
+
+{- TODO:
+    - deleting the last frame results in index out of bounds error
+    - when creating a joint in a frame, it should be created in other frames as well
+        -> first version should just place the joint in same position in all frames,
+            regardless of other positions. Later on it could be possible to take into account
+            parent distance in each frame or something else "intelligent".
+-}
