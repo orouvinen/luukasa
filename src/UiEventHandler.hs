@@ -86,8 +86,8 @@ canvasKeyPress s eventKey = do
             Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-10)
             Gdk.KEY_KP_Add      -> dispatch E.CreateFrame
             Gdk.KEY_KP_Subtract -> dispatch E.DeleteFrame
-            Gdk.KEY_Left        -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) - 1
-            Gdk.KEY_Right       -> dispatch $ E.ShowFrame $ A.currentFrame (animation appState) + 1
+            Gdk.KEY_Left        -> dispatch $ E.FrameStep (-1)
+            Gdk.KEY_Right       -> dispatch $ E.FrameStep 1
             _                   -> Right appState
 
     applyResult result

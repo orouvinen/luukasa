@@ -8,6 +8,9 @@ data Frame = Frame
     , _body :: Body
     }
 
+instance Show Frame where
+    show f = "FrameNum " ++ show (num f)
+
 mkFrame :: Int -> Int -> Body -> Frame
 mkFrame fps num body = Frame { _num = num, _body = body }
 

@@ -69,5 +69,4 @@ printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root body
 
 printState :: AppState -> String
 printState s =
-    "Sel: " ++ show (selectedJointIds s) ++ "\n"
-    ++ "aState:" ++ show (actionState s) ++ "\n"
+    "animation:" ++ show (animation s) ++ "\n"

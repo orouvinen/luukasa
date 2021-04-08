@@ -24,7 +24,7 @@ data Event
     -- Animation
     | CreateFrame
     | DeleteFrame
-    | ShowFrame FrameNum
+    | FrameStep Int
 
 type ErrorMessage = T.Text
 
@@ -86,10 +86,9 @@ dispatchAction s e =
 
         DeleteFrame -> Right s { ST.animation = A.deleteCurrentFrame animation }
 
-        ShowFrame frameNum -> Right s { ST.animation = A.setCurrentFrame animation frameNum }
+        FrameStep n -> Right s { ST.animation = A.frameStep animation n }
 
 {- TODO:
-    - deleting the last frame results in index out of bounds error
     - when creating a joint in a frame, it should be created in other frames as well
         -> first version should just place the joint in same position in all frames,
             regardless of other positions. Later on it could be possible to take into account
