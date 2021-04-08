@@ -3,7 +3,6 @@ module Render (render) where
 import qualified Animation              as A
 import qualified AppState               as ST
 import qualified Body                   as B
-import qualified Frame                  as F
 import qualified Joint                  as J
 import qualified JointSelect            as Sel
 

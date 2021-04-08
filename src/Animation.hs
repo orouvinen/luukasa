@@ -19,11 +19,9 @@ import           Body          (Body)
 import           Data.Foldable (toList)
 import           Data.Sequence (Seq, (<|), (><), (|>))
 import qualified Data.Sequence as Seq
-import           Frame         (Frame)
-import qualified Frame         as F
 
 data Animation = Animation
-    { _frames       :: Seq Frame
+    { _frames       :: Seq Body
     , _currentFrame :: Int
     , _fps          :: Int
     }
@@ -80,12 +78,14 @@ setCurrentFrame animation (FrameNum n)
     | n < 0             = animation { _currentFrame = 0 }
     | otherwise         = animation { _currentFrame = n }
       where
+        frameBody = Seq.index (_frames animation) n
         numFrames = Seq.length (_frames animation)
 
 frameStep :: Animation -> Int -> Animation
 frameStep a n =
     let numFrames = Seq.length (_frames a)
         frameNum = (_currentFrame a + n) `mod` numFrames
+        frameBody = Seq.index (_frames a) n
     in a { _currentFrame = frameNum }
 
 currentTimeCode :: Animation -> String
@@ -105,23 +105,21 @@ frameTimeCode fps (FrameNum num) =
 
 -- | The current body that's the object of edits & rendering
 currentFrameBody :: Animation -> Body
-currentFrameBody a =
-    let frame = Seq.index (_frames a) (_currentFrame a)
-    in F.body frame
+currentFrameBody a = Seq.index (_frames a) (_currentFrame a)
 
 -- | Replace the active frame's body
 setCurrentFrameBody :: Animation -> Body -> Animation
-setCurrentFrameBody animation body =
-    let frame = Seq.index (_frames animation) (_currentFrame animation)
-        newFrame = F.setBody frame body
-    in setFrameData animation newFrame (currentFrameNum animation)
+setCurrentFrameBody animation body = setFrameData animation body (currentFrameNum animation)
+
+setFrameData :: Animation -> Body -> FrameNum -> Animation
+setFrameData a f (FrameNum i) = a { _frames = frames }
+  where
+    frames = Seq.adjust (const f) i (_frames a)
 
 appendFrame :: Animation -> Body -> Animation
-appendFrame animation body =
-    let numFrames = Seq.length (_frames animation)
-        frameNum = numFrames
-        newFrame = F.mkFrame (_fps animation) frameNum body
-    in appendFrame' animation newFrame
+appendFrame a b = a { _frames = frames }
+  where
+    frames = _frames a |> b
 
 deleteCurrentFrame :: Animation -> Animation
 deleteCurrentFrame a =
@@ -132,27 +130,19 @@ deleteCurrentFrame a =
 deleteFrame :: Animation -> FrameNum -> Animation
 deleteFrame a (FrameNum n) = a { _frames = frames, _currentFrame = newCurrentFrame }
   where
-    frames = Seq.filter (\f -> F.num f /= n) (_frames a)
-    numFrames = Seq.length frames
-    newCurrentFrame = min (numFrames - 1) n
+      (start, end) = Seq.splitAt n (_frames a)
+      frames = start <> Seq.drop 1 end
+      newCurrentFrame = min n (Seq.length frames - 1)
 
-setFrameData :: Animation -> Frame -> FrameNum -> Animation
-setFrameData a f (FrameNum i) = a { _frames = frames }
+appendFrame' :: Animation -> Body -> Animation
+appendFrame' a b = a { _frames = frames }
   where
-    frames = Seq.adjust (const f) i (_frames a)
+    frames = _frames a |> b
 
-appendFrame' :: Animation -> Frame -> Animation
-appendFrame' a f = a { _frames = frames }
-  where
-    frames = _frames a |> f
-
-prependFrame' :: Animation -> Frame -> Animation
+prependFrame' :: Animation -> Body -> Animation
 prependFrame' a f = a { _frames = frames }
   where
     frames = f <| _frames a
-
-fixFrameNums :: Animation -> Animation
-fixFrameNums = undefined -- TODO: flatten frame sequence numbers
 
 -- insertFrame' :: Animation -> Frame -> Int -> Animation
 -- insertFrame' a f i =
