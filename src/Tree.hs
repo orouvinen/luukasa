@@ -1,3 +1,7 @@
+{-
+    A generic tree implementation, but still with a primary goal of supporting the needs of
+    the Luukasa application first and foremost.
+-}
 {-# LANGUAGE DeriveTraversable #-}
 
 module Tree (Tree, val, children, create, insert, replaceVal, delete, findNodeBy, findNode, replaceValBy, replaceNodeBy, replaceNode, setVal, setChildren, setChildValues) where
@@ -13,7 +17,7 @@ data Tree a
         , uniqueAncestorId :: Int      -- ^ The sibling number of the root's direct child this node is descendant of
         , siblingId        :: Int      -- ^ Node's own sibling num (X)
         , depth            :: Int      -- ^ Node's depth (Y)
-        } deriving (Functor, Foldable)
+        } deriving (Functor, Foldable, Traversable)
 
 
 instance Eq (Tree a) where

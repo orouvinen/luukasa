@@ -4,9 +4,9 @@ module BodySpec (spec) where
 import           Data.Maybe
 import           Test.Hspec
 
-import qualified Body       as B
-import           Joint
-import qualified Tree       as T
+import qualified Luukasa.Body  as B
+import           Luukasa.Joint
+import qualified Tree          as T
 
 mkJointAt :: Int -> Double -> Double -> Joint
 mkJointAt jointId x y = Joint { jointId = jointId, jointX = x, jointY = y, jointLocalRot = 0, jointWorldRot = 0, jointR = 0 }

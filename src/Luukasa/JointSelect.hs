@@ -1,9 +1,9 @@
-module JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocal, screenToLocalBody, toggle, isSelected) where
+module Luukasa.JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocal, screenToLocalBody, toggle, isSelected) where
 
-import qualified Body          as B
 import           Calc
 import           Data.Foldable (toList)
-import qualified Joint         as J
+import qualified Luukasa.Body  as B
+import qualified Luukasa.Joint as J
 
 selectRadius :: Double
 selectRadius = 5.0

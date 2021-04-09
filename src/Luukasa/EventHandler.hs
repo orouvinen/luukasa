@@ -1,16 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
-module EventHandler (Event(..), SelectMode(..), dispatchAction, ErrorMessage) where
+module Luukasa.EventHandler (Event(..), SelectMode(..), dispatchAction, ErrorMessage) where
 
-import           Animation     (FrameNum)
-import qualified Animation     as A
-import qualified AppState      as ST
-import qualified Body          as B
-import           Data.Foldable (foldl')
-import           Data.Maybe    (fromJust, mapMaybe)
-import qualified Data.Text     as T
-import qualified Joint         as J
-import           JointSelect   as Sel
-import qualified Tree          as T
+import           Data.Foldable       (foldl')
+import           Data.Maybe          (fromJust, mapMaybe)
+import qualified Data.Text           as T
+
+import           Luukasa.Animation   (FrameNum)
+import qualified Luukasa.Animation   as A
+import qualified Luukasa.AppState    as ST
+import qualified Luukasa.Body        as B
+import qualified Luukasa.Joint       as J
+import           Luukasa.JointSelect as Sel
+import qualified Tree                as T
 
 data SelectMode = Set | Toggle
 data Event
@@ -88,9 +89,3 @@ dispatchAction s e =
 
         FrameStep n -> Right s { ST.animation = A.frameStep animation n }
 
-{- TODO:
-    - when creating a joint in a frame, it should be created in other frames as well
-        -> first version should just place the joint in same position in all frames,
-            regardless of other positions. Later on it could be possible to take into account
-            parent distance in each frame or something else "intelligent".
--}

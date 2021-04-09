@@ -1,10 +1,10 @@
-module Render (render) where
+module Luukasa.Render (render) where
 
-import qualified Animation              as A
-import qualified AppState               as ST
-import qualified Body                   as B
-import qualified Joint                  as J
-import qualified JointSelect            as Sel
+import qualified Luukasa.Animation      as A
+import qualified Luukasa.AppState       as ST
+import qualified Luukasa.Body           as B
+import qualified Luukasa.Joint          as J
+import qualified Luukasa.JointSelect    as Sel
 
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader   (ReaderT, ask, asks, lift, runReaderT)

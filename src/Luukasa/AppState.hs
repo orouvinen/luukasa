@@ -1,13 +1,13 @@
-module AppState where
+module Luukasa.AppState where
 
-import           Animation     (Animation)
-import qualified Animation     as A
+import           Data.Foldable     (toList)
+import qualified Data.Text         as T
 
-import           Body          (Body)
-import qualified Body          as B
-import           Data.Foldable (toList)
-import qualified Data.Text     as T
-import           Joint         (JointId, JointLockMode (..))
+import           Luukasa.Animation (Animation)
+import qualified Luukasa.Animation as A
+import           Luukasa.Body      (Body)
+import qualified Luukasa.Body      as B
+import           Luukasa.Joint     (JointId, JointLockMode (..))
 
 data ActionState
     = Idle

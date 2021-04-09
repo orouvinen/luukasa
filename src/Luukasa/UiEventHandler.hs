@@ -15,15 +15,15 @@
             3. call dispatchAction and
             4. replace mutable state with state returned by dispatchAction
 -}
-module UiEventHandler where
+module Luukasa.UiEventHandler where
 
 import           Data.IORef
-import           EventHandler as E (Event (..), SelectMode (..), dispatchAction)
-import qualified GI.Gdk       as Gdk
+import qualified GI.Gdk               as Gdk
 -- import qualified GI.Gdk.Objects as GO
-
-import qualified Animation    as A
-import           AppState     as ST
+import qualified Luukasa.Animation    as A
+import           Luukasa.AppState     as ST
+import           Luukasa.EventHandler as E (Event (..), SelectMode (..),
+                                            dispatchAction)
 
 updateAppState :: Show a => IORef AppState -> Either a AppState -> IO ()
 updateAppState stateRef result =

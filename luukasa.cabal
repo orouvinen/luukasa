@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a1da777034822197522ec59e017bee2dd7ee938d123ffca5a11e33cf643e536f
+-- hash: 3eafc03e0b86f36efe960b0e0611e219f5c45322c94747c146accc9546b83bbe
 
 name:           luukasa
 version:        0.1.0.0
@@ -27,16 +27,16 @@ source-repository head
 
 library
   exposed-modules:
-      Animation
-      AppState
-      Body
       Calc
-      EventHandler
-      Joint
-      JointSelect
-      Render
+      Luukasa.Animation
+      Luukasa.AppState
+      Luukasa.Body
+      Luukasa.EventHandler
+      Luukasa.Joint
+      Luukasa.JointSelect
+      Luukasa.Render
+      Luukasa.UiEventHandler
       Tree
-      UiEventHandler
       Units
   other-modules:
       Paths_luukasa

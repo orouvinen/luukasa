@@ -1,4 +1,4 @@
-module Joint where
+module Luukasa.Joint where
 
 import           Calc  (angle, distance, rotd)
 import           Units (Degrees, getDegrees, getRadians, rad)

@@ -1,4 +1,4 @@
-module Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint, createJoint) where
+module Luukasa.Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint, createJoint) where
 
 import           Data.Function ((&))
 import           Data.List
@@ -6,8 +6,8 @@ import           Data.List
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
 import           Data.Maybe    (fromJust, isNothing)
-import           Joint         (Joint (..), JointId, JointLockMode (..))
-import qualified Joint         as J
+import           Luukasa.Joint (Joint (..), JointId, JointLockMode (..))
+import qualified Luukasa.Joint as J
 import           Tree          (Tree)
 import qualified Tree          as T (children, create, findNode, findNodeBy,
                                      insert, replaceNode, replaceNodeBy,

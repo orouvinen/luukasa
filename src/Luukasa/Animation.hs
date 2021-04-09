@@ -1,5 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Animation
+module Luukasa.Animation
     ( Animation
     , FrameNum
     , mkFrameNum
@@ -15,10 +14,10 @@ module Animation
     , setCurrentFrameBody)
     where
 
-import           Body          (Body)
 import           Data.Foldable (toList)
 import           Data.Sequence (Seq, (<|), (><), (|>))
 import qualified Data.Sequence as Seq
+import           Luukasa.Body  (Body)
 
 data Animation = Animation
     { _frames       :: Seq Body

@@ -3,7 +3,7 @@
 
 module AnimationSpec where
 
-import qualified Animation  as A
+import qualified Luukasa.Animation as A
 import           Test.Hspec
 
 spec :: Spec

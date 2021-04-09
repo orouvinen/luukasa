@@ -3,14 +3,15 @@
 
 module Main where
 
-import           AppState
 import           Data.GI.Base
 import           Data.IORef
 import           GI.Cairo.Render.Connector (renderWithContext)
 import           GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
-import qualified Render
-import qualified UiEventHandler            as EV
+
+import           Luukasa.AppState
+import qualified Luukasa.Render            as Render
+import qualified Luukasa.UiEventHandler    as EV
 
 windowWidth :: Int
 windowWidth = 800
