@@ -150,8 +150,8 @@ segmentBetween from to = ((from & x, from & y), (to & x, to & y))
         x = jointX . T.val
         y = jointY . T.val
 
-createJoint :: Body -> J.JointId -> J.JointId -> Double -> Double -> Body
-createJoint body parentJointId jointId x y =
+createJoint :: J.JointId -> J.JointId -> Double -> Double -> Body -> Body
+createJoint parentJointId jointId x y body =
     let parent = T.val $ fromJust $ T.findNodeBy (\j -> J.jointId j == parentJointId) (root body)
         newJoint =
             J.setChildAngleAndRadius

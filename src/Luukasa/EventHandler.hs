@@ -37,12 +37,11 @@ dispatchAction s e =
         CreateJoint x y ->
             let newJointId = ST.nextCreateJointId s
                 parentJointId = head $ ST.selectedJointIds s
-                translateX = ST.translateX s
-                translateY = ST.translateY s
+                (translateX, translateY) = (ST.translateX s, ST.translateY s)
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
-                body' = B.createJoint body parentJointId newJointId localX localY
+                animation' = fmap (B.createJoint parentJointId newJointId localX localY) animation
             in Right s
-                { ST.animation = A.setCurrentFrameData animation body'
+                { ST.animation = animation'
                 , ST.nextCreateJointId = newJointId + 1
                 }
 

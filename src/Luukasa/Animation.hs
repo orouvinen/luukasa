@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Luukasa.Animation
     ( Animation
     , FrameNum
@@ -26,7 +28,7 @@ data Animation a = Animation
     { _frames       :: Seq a
     , _currentFrame :: Int
     , _fps          :: Int
-    }
+    } deriving Functor
 
 newtype FrameNum = FrameNum { unFrameNum :: Int }
 
@@ -111,7 +113,7 @@ frameData a (FrameNum i) = Seq.index (_frames a) i
 setFrameData :: Animation a -> a -> FrameNum -> Animation a
 setFrameData a f (FrameNum i) = a { _frames = frames }
   where
-    frames = Seq.adjust (const f) i (_frames a)
+    frames = Seq.update i f (_frames a)
 
 -- | Replace the active frame's data
 setCurrentFrameData :: Animation a -> a -> Animation a
