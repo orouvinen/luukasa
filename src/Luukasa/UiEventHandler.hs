@@ -1,26 +1,11 @@
 {-# LANGUAGE OverloadedLabels  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-
-    Intermediate event handlers.
-    These will act as a bridge from IO monad to pure code.
 
-    These will:
-        1. read in current mutable state from IORef
-        2. get all necessary data from the EventWhatever
-
-        In case of event that is purely UI specific (such as ViewScale change etc.)
-            3. update state directly without going any further
-
-        In case of domain specific action,
-            3. call dispatchAction and
-            4. replace mutable state with state returned by dispatchAction
--}
 module Luukasa.UiEventHandler where
 
 import           Data.IORef
 import qualified GI.Gdk               as Gdk
 -- import qualified GI.Gdk.Objects as GO
-import qualified Luukasa.Animation    as A
 import           Luukasa.AppState     as ST
 import           Luukasa.EventHandler as E (Event (..), SelectMode (..),
                                             dispatchAction)
@@ -31,8 +16,8 @@ updateAppState stateRef result =
         Left err       -> print err
         Right newState -> writeIORef stateRef newState
 
-canvasMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO ()
-canvasMouseButtonClick s e = do
+canvasPrimaryMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO ()
+canvasPrimaryMouseButtonClick s e = do
     appState <- readIORef s
 
     x <- truncate <$> Gdk.getEventButtonX e
@@ -49,8 +34,8 @@ canvasMouseButtonClick s e = do
 
     applyResult result
 
-canvasMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO ()
-canvasMouseButtonRelease s e = do
+canvasPrimaryMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO ()
+canvasPrimaryMouseButtonRelease s e = do
     appState <- readIORef s
 
     let newState = appState { actionState = Idle }

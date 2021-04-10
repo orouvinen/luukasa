@@ -59,12 +59,24 @@ buildUi state = do
         ]
 
     _ <- Gtk.onWidgetButtonPressEvent canvas $ \ev -> do
-        EV.canvasMouseButtonClick state ev
+        button <- fromIntegral <$> ev `Gdk.get` #button
+
+        case button of
+            Gdk.BUTTON_PRIMARY   -> EV.canvasPrimaryMouseButtonClick state ev
+            Gdk.BUTTON_SECONDARY -> return ()
+            Gdk.BUTTON_MIDDLE    -> return ()
+
         Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         return True
 
     _ <- Gtk.onWidgetButtonReleaseEvent canvas $ \ev -> do
-        EV.canvasMouseButtonRelease state ev
+        button <- fromIntegral <$> ev `Gdk.get` #button
+
+        case button of
+            Gdk.BUTTON_PRIMARY -> EV.canvasPrimaryMouseButtonRelease state ev
+            Gdk.BUTTON_SECONDARY -> return ()
+            Gdk.BUTTON_MIDDLE -> return ()
+
         Gtk.widgetQueueDraw canvas
         return True
     {- KeyEvent handler directly on `window`:
