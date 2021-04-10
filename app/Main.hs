@@ -62,9 +62,8 @@ buildUi state = do
         button <- fromIntegral <$> ev `Gdk.get` #button
 
         case button of
-            Gdk.BUTTON_PRIMARY   -> EV.canvasPrimaryMouseButtonClick state ev
-            Gdk.BUTTON_SECONDARY -> return ()
-            Gdk.BUTTON_MIDDLE    -> return ()
+            Gdk.BUTTON_PRIMARY -> EV.canvasPrimaryMouseButtonClick state ev
+            _                  -> return ()
 
         Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         return True
@@ -74,8 +73,7 @@ buildUi state = do
 
         case button of
             Gdk.BUTTON_PRIMARY -> EV.canvasPrimaryMouseButtonRelease state ev
-            Gdk.BUTTON_SECONDARY -> return ()
-            Gdk.BUTTON_MIDDLE -> return ()
+            _                  -> return ()
 
         Gtk.widgetQueueDraw canvas
         return True

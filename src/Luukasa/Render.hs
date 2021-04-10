@@ -8,7 +8,6 @@ import qualified Luukasa.JointSelect    as Sel
 
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader   (ReaderT, ask, asks, lift, runReaderT)
-import           Data.Bifunctor         (bimap)
 import           Data.Foldable          (toList)
 import           Data.IORef
 

@@ -8,13 +8,13 @@ newtype Radians = Radians { getRadians :: Double } deriving (Show, Num, Ord, Eq)
 newtype Degrees = Degrees { getDegrees :: Double } deriving (Show, Num, Ord, Eq)
 
 mkDegrees :: Double -> Degrees
-mkDegrees deg = Degrees $ fixDegrees deg
+mkDegrees d = Degrees $ fixDegrees d
     where fixDegrees x
             | x >= 360 || x < 0 = mod' x 360
             | otherwise         = x
 
 mkRadians :: Double -> Radians
-mkRadians rad = Radians $ fixRadians rad
+mkRadians r = Radians $ fixRadians r
     where fixRadians x
             | x >= pi * 2 || x < 0  = mod' x (pi * 2)
             | otherwise             = x

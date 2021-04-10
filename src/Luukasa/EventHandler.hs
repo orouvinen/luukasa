@@ -2,10 +2,10 @@
 module Luukasa.EventHandler (Event(..), SelectMode(..), dispatchAction, ErrorMessage) where
 
 import           Data.Foldable       (foldl')
-import           Data.Maybe          (fromJust, mapMaybe)
+import           Data.Function       ((&))
+import           Data.Maybe          (mapMaybe)
 import qualified Data.Text           as T
 
-import           Luukasa.Animation   (FrameNum)
 import qualified Luukasa.Animation   as A
 import qualified Luukasa.AppState    as ST
 import qualified Luukasa.Body        as B
@@ -62,7 +62,7 @@ dispatchAction s e =
                     (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
                     (ST.selectedJointIds s)
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
-                body' = foldl' (\body rotateNext -> rotateNext body) body rotateActions
+                body' = foldl' (&) body rotateActions
             in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
         MoveSelected x y ->
@@ -74,8 +74,8 @@ dispatchAction s e =
                 joint = T.val <$> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
             in case joint of
                 Nothing     -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
-                Just joint  ->
-                    let body' = B.moveJoint localX localY joint body
+                Just j  ->
+                    let body' = B.moveJoint localX localY j body
                     in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
         ExtendSelectionRect x y -> Right s

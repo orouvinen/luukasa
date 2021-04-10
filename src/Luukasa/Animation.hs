@@ -20,9 +20,8 @@ module Luukasa.Animation
     ) where
 
 import           Data.Foldable (toList)
-import           Data.Sequence (Seq, (<|), (><), (|>))
+import           Data.Sequence (Seq, (<|), (|>))
 import qualified Data.Sequence as Seq
-import           Luukasa.Body  (Body)
 
 data Animation a = Animation
     { _frames       :: Seq a
@@ -30,7 +29,7 @@ data Animation a = Animation
     , _fps          :: Int
     } deriving Functor
 
-newtype FrameNum = FrameNum { unFrameNum :: Int }
+newtype FrameNum = FrameNum Int
 
 instance Show FrameNum where
     show (FrameNum x) = show x

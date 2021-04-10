@@ -6,7 +6,7 @@ import           Data.List
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
 import           Data.Maybe    (fromJust, isNothing)
-import           Luukasa.Joint (Joint (..), JointId, JointLockMode (..))
+import           Luukasa.Joint (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint as J
 import           Tree          (Tree)
 import qualified Tree          as T (children, create, findNode, findNodeBy,
@@ -26,7 +26,7 @@ data Body = Body
 
 create :: Body
 create =
-    let rootJoint = Joint
+    let rootJoint = J.Joint
             { J.jointId = rootJointId
             , J.jointX = 0
             , J.jointY = 0
@@ -44,8 +44,7 @@ create =
 
 rotateJoint :: JointLockMode -> Double -> Joint -> Body -> Body
 rotateJoint lockMode deg joint body =
-    let isRotatee j = J.jointId j == J.jointId joint
-        parent = getParent body (J.jointId joint)
+    let parent = getParent body (J.jointId joint)
         originalX = J.jointX joint
         originalY = J.jointY joint
 
@@ -130,7 +129,7 @@ getParent body jointId =
 
 jointPositions :: Body -> [(Double, Double)]
 jointPositions body =
-    foldl' (\coords j -> (jointX j, jointY j) : coords) [] (root body)
+    foldl' (\coords j -> (J.jointX j, J.jointY j) : coords) [] (root body)
 
 limbSegments :: Body -> [((Double, Double), (Double, Double))]
 limbSegments body = segmentsToChildren $ root body
@@ -147,8 +146,8 @@ segmentsToChildren from =
 segmentBetween :: Tree Joint -> Tree Joint -> ((Double, Double), (Double, Double))
 segmentBetween from to = ((from & x, from & y), (to & x, to & y))
     where
-        x = jointX . T.val
-        y = jointY . T.val
+        x = J.jointX . T.val
+        y = J.jointY . T.val
 
 createJoint :: J.JointId -> J.JointId -> Double -> Double -> Body -> Body
 createJoint parentJointId jointId x y body =

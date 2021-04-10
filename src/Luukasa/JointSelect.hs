@@ -1,4 +1,11 @@
-module Luukasa.JointSelect (trySelectAt, bodyToScreenCoordinates, screenToLocal, screenToLocalBody, toggle, isSelected) where
+module Luukasa.JointSelect
+    ( trySelectAt
+    , bodyToScreenCoordinates
+    , screenToLocal
+    , screenToLocalBody
+    , toggle
+    , isSelected)
+    where
 
 import           Calc
 import           Data.Foldable (toList)
@@ -23,8 +30,7 @@ isSelected = elem
 
 toggle :: J.JointId -> [J.JointId] -> [J.JointId]
 toggle jointId selection =
-    let isSelected = jointId `elem` selection
-    in if isSelected
+    if isSelected jointId selection
         then filter (/= jointId) selection
         else jointId : selection
 
