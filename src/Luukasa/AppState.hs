@@ -22,12 +22,12 @@ data DragMode = DragMove | DragRotate deriving Show
 defaultFps :: Int
 defaultFps = 24
 
-initialAnimation :: Animation
+initialAnimation :: Animation Body
 initialAnimation = A.appendFrame (A.mkAnimation defaultFps) B.create
 
 data AppState = AppState
     { actionState       :: ActionState
-    , animation         :: Animation
+    , animation         :: Animation Body
     , nextCreateJointId :: Int
     , fileName          :: Maybe T.Text
     , viewScale         :: Double
@@ -56,16 +56,16 @@ selectionSize :: AppState -> Int
 selectionSize = length . selectedJointIds
 
 visibleBody :: AppState -> Body
-visibleBody = A.currentFrameBody . animation
+visibleBody = A.currentFrameData . animation
 
 setVisibleBody :: AppState -> Body -> AppState
 setVisibleBody s b =
-    s { animation = A.setCurrentFrameBody (animation s) b }
+    s { animation = A.setCurrentFrameData (animation s) b }
 
 printJoints :: AppState -> String
 printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root body
   where
-    body = A.currentFrameBody (animation s)
+    body = A.currentFrameData (animation s)
 
 printState :: AppState -> String
 printState s =

@@ -19,9 +19,9 @@ data Joint = Joint
     { jointId       :: JointId
     , jointX        :: Double
     , jointY        :: Double
-    , jointLocalRot :: Degrees -- Rotation around parent joint
-    , jointWorldRot :: Degrees -- Rotation on screen
-    , jointR        :: Double -- Distance (radius for rotation) to parent
+    , jointLocalRot :: Degrees -- ^ Rotation around parent joint
+    , jointWorldRot :: Degrees -- ^ Rotation on screen
+    , jointR        :: Double --  ^ Distance (radius for rotation) to parent
     } deriving Show
 
 instance Eq Joint where

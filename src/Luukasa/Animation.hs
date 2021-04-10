@@ -2,25 +2,28 @@ module Luukasa.Animation
     ( Animation
     , FrameNum
     , mkFrameNum
-    , currentFrameNum
-    , setCurrentFrame
-    , frameStep
-    , currentTimeCode
     , mkAnimation
+    , currentFrameNum
+    , currentTimeCode
+    , frameStep
+    , setCurrentFrame
+    , frameData
+    , setFrameData
+    , currentFrameData
+    , setCurrentFrameData
     , appendFrame
+    , prependFrame
     , deleteFrame
     , deleteCurrentFrame
-    , currentFrameBody
-    , setCurrentFrameBody)
-    where
+    ) where
 
 import           Data.Foldable (toList)
 import           Data.Sequence (Seq, (<|), (><), (|>))
 import qualified Data.Sequence as Seq
 import           Luukasa.Body  (Body)
 
-data Animation = Animation
-    { _frames       :: Seq Body
+data Animation a = Animation
+    { _frames       :: Seq a
     , _currentFrame :: Int
     , _fps          :: Int
     }
@@ -40,7 +43,7 @@ data TimeCode = TimeCode
     , frame  :: Int
     }
 
-instance Show Animation where
+instance Show a => Show (Animation a) where
     show a = "FPS: "
         ++ show (_fps a)
         ++ " frm: "
@@ -61,35 +64,15 @@ instance Show TimeCode where
             | x < 10    = "00" ++ show x
             | otherwise = "0" ++ show x
 
-mkAnimation :: Int -> Animation
+mkAnimation :: Int -> Animation a
 mkAnimation fps = Animation
     { _frames = Seq.Empty
     , _currentFrame = 0
     , _fps = fps
     }
 
-currentFrameNum :: Animation -> FrameNum
+currentFrameNum :: Animation a -> FrameNum
 currentFrameNum = FrameNum . _currentFrame
-
-setCurrentFrame :: Animation -> FrameNum -> Animation
-setCurrentFrame animation (FrameNum n)
-    | n > numFrames - 1 = animation { _currentFrame = numFrames - 1 }
-    | n < 0             = animation { _currentFrame = 0 }
-    | otherwise         = animation { _currentFrame = n }
-      where
-        frameBody = Seq.index (_frames animation) n
-        numFrames = Seq.length (_frames animation)
-
-frameStep :: Animation -> Int -> Animation
-frameStep a n =
-    let numFrames = Seq.length (_frames a)
-        frameNum = (_currentFrame a + n) `mod` numFrames
-        frameBody = Seq.index (_frames a) n
-    in a { _currentFrame = frameNum }
-
-currentTimeCode :: Animation -> String
-currentTimeCode animation =
-    show $ frameTimeCode (_fps animation) (currentFrameNum animation)
 
 frameTimeCode :: Int -> FrameNum -> TimeCode
 frameTimeCode fps (FrameNum num) =
@@ -102,46 +85,68 @@ frameTimeCode fps (FrameNum num) =
         frame' = (num `mod` fps) + 1
     in TimeCode hours' minutes' seconds' frame'
 
--- | The current body that's the object of edits & rendering
-currentFrameBody :: Animation -> Body
-currentFrameBody a = Seq.index (_frames a) (_currentFrame a)
+currentTimeCode :: Animation a -> String
+currentTimeCode animation =
+    show $ frameTimeCode (_fps animation) (currentFrameNum animation)
 
--- | Replace the active frame's body
-setCurrentFrameBody :: Animation -> Body -> Animation
-setCurrentFrameBody animation body = setFrameData animation body (currentFrameNum animation)
+frameStep :: Animation a -> Int -> Animation a
+frameStep a n =
+    let numFrames = Seq.length (_frames a)
+        frameNum = (_currentFrame a + n) `mod` numFrames
+    in a { _currentFrame = frameNum }
 
-setFrameData :: Animation -> Body -> FrameNum -> Animation
+setCurrentFrame :: Animation a -> FrameNum -> Animation a
+setCurrentFrame animation (FrameNum n)
+    | n > numFrames - 1 = animation { _currentFrame = numFrames - 1 }
+    | n < 0             = animation { _currentFrame = 0 }
+    | otherwise         = animation { _currentFrame = n }
+      where
+        numFrames = Seq.length (_frames animation)
+
+-- | Get data for given frame
+frameData :: Animation a -> FrameNum -> a
+frameData a (FrameNum i) = Seq.index (_frames a) i
+
+-- | Set data for given frame
+setFrameData :: Animation a -> a -> FrameNum -> Animation a
 setFrameData a f (FrameNum i) = a { _frames = frames }
   where
     frames = Seq.adjust (const f) i (_frames a)
 
-appendFrame :: Animation -> Body -> Animation
+-- | Replace the active frame's data
+setCurrentFrameData :: Animation a -> a -> Animation a
+setCurrentFrameData animation body = setFrameData animation body (currentFrameNum animation)
+
+-- | Get data of the currently active frame
+currentFrameData :: Animation a -> a
+currentFrameData a = Seq.index (_frames a) (_currentFrame a)
+
+-- | Insert new frame with data at the end of the animation sequence
+appendFrame :: Animation a -> a -> Animation a
 appendFrame a b = a { _frames = frames }
   where
     frames = _frames a |> b
 
-deleteCurrentFrame :: Animation -> Animation
+-- | Insert new frame with data at the start of the animation sequence
+prependFrame :: Animation a -> a -> Animation a
+prependFrame a f = a { _frames = frames }
+  where
+    frames = f <| _frames a
+
+-- | Delete currently active frame
+deleteCurrentFrame :: Animation a -> Animation a
 deleteCurrentFrame a =
     if Seq.length (_frames a) == 1
         then a
         else deleteFrame a (currentFrameNum a)
 
-deleteFrame :: Animation -> FrameNum -> Animation
+-- | Delete given frame
+deleteFrame :: Animation a -> FrameNum -> Animation a
 deleteFrame a (FrameNum n) = a { _frames = frames, _currentFrame = newCurrentFrame }
   where
       (start, end) = Seq.splitAt n (_frames a)
       frames = start <> Seq.drop 1 end
       newCurrentFrame = min n (Seq.length frames - 1)
-
-appendFrame' :: Animation -> Body -> Animation
-appendFrame' a b = a { _frames = frames }
-  where
-    frames = _frames a |> b
-
-prependFrame' :: Animation -> Body -> Animation
-prependFrame' a f = a { _frames = frames }
-  where
-    frames = f <| _frames a
 
 -- insertFrame' :: Animation -> Frame -> Int -> Animation
 -- insertFrame' a f i =

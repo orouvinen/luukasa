@@ -32,7 +32,7 @@ type ErrorMessage = T.Text
 dispatchAction :: ST.AppState -> Event -> Either ErrorMessage ST.AppState
 dispatchAction s e =
     let animation = ST.animation s
-        body = A.currentFrameBody $ ST.animation s
+        body = A.currentFrameData $ ST.animation s
     in case e of
         CreateJoint x y ->
             let newJointId = ST.nextCreateJointId s
@@ -42,7 +42,7 @@ dispatchAction s e =
                 (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
                 body' = B.createJoint body parentJointId newJointId localX localY
             in Right s
-                { ST.animation = A.setCurrentFrameBody animation body'
+                { ST.animation = A.setCurrentFrameData animation body'
                 , ST.nextCreateJointId = newJointId + 1
                 }
 
@@ -64,7 +64,7 @@ dispatchAction s e =
                     (ST.selectedJointIds s)
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
                 body' = foldl' (\body rotateNext -> rotateNext body) body rotateActions
-            in Right s { ST.animation = A.setCurrentFrameBody animation body' }
+            in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
         MoveSelected x y ->
             let translateX = ST.translateX s
@@ -77,7 +77,7 @@ dispatchAction s e =
                 Nothing     -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
                 Just joint  ->
                     let body' = B.moveJoint localX localY joint body
-                    in Right s { ST.animation = A.setCurrentFrameBody animation body' }
+                    in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
         ExtendSelectionRect x y -> Right s
 

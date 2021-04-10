@@ -4,7 +4,24 @@
 -}
 {-# LANGUAGE DeriveTraversable #-}
 
-module Tree (Tree, val, children, create, insert, replaceVal, delete, findNodeBy, findNode, replaceValBy, replaceNodeBy, replaceNode, setVal, setChildren, setChildValues) where
+module Tree
+    ( Tree
+    , val
+    , children
+    , create
+    , insert
+    , replaceVal
+    , delete
+    , findNodeBy
+    , findNode
+    , replaceValBy
+    , replaceNodeBy
+    , replaceNode
+    , setVal
+    , setChildren
+    , setChildValues
+    ) where
+
 
 import           Data.List  (find, intersperse)
 import           Data.Maybe (catMaybes)
