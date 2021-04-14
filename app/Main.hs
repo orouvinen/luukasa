@@ -98,9 +98,14 @@ buildUi state = do
         Gtk.widgetQueueDraw canvas
         return True
 
+    menuBar <- buildMenuBar state window
+
     -- Put all the parts together
     Gtk.gridAttach grid canvas 0 1 1 1
+    Gtk.gridAttach grid menuBar 0 0 1 1
+
     Gtk.containerAdd window grid
+
     Gtk.windowSetPosition window Gtk.WindowPositionCenter
 
     #showAll window
@@ -114,4 +119,31 @@ buildUi state = do
     _ <- EV.setViewTranslate state (width' / 2) (height' / 2)
 
     return ()
+
+buildMenuBar :: IORef AppState -> Gtk.Window -> IO Gtk.MenuBar
+buildMenuBar s window = do
+    menuBar <- Gtk.menuBarNew
+
+    -- Create menu items
+    fileMenu <- Gtk.menuNew
+    file <- Gtk.menuItemNewWithMnemonic "_File"
+    fileSave <- Gtk.menuItemNewWithMnemonic "_Save"
+    fileOpen <- Gtk.menuItemNewWithMnemonic "_Open"
+    fileQuit <- Gtk.menuItemNewWithMnemonic "_Quit"
+
+    -- Attach actions
+
+    Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
+    Gtk.onMenuItemActivate fileSave $ EV.menuSave s window
+    Gtk.onMenuItemActivate fileOpen $ EV.menuOpen s window
+
+
+    -- "File" menu
+    Gtk.menuShellAppend fileMenu fileSave
+    Gtk.menuShellAppend fileMenu fileOpen
+    Gtk.menuShellAppend fileMenu fileQuit
+    Gtk.menuItemSetSubmenu file (Just fileMenu)
+    Gtk.containerAdd menuBar file
+
+    return menuBar
 

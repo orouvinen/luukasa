@@ -3,9 +3,12 @@
 
 module Luukasa.UiEventHandler where
 
+import           Data.GI.Base
 import           Data.IORef
 import qualified GI.Gdk               as Gdk
+import qualified GI.Gtk               as Gtk
 -- import qualified GI.Gdk.Objects as GO
+import           Control.Monad        (when)
 import           Luukasa.AppState     as ST
 import           Luukasa.EventHandler as E (Event (..), SelectMode (..),
                                             dispatchAction)
@@ -137,3 +140,48 @@ setViewTranslate s trX trY = do
     let newState = state { translateX = trX, translateY = trY }
 
     writeIORef s newState
+
+-- TODO: get filename from filechooser:
+-- https://github.com/haskell-gi/gi-gtk-examples/blob/master/filechooser/FileChooserDemo.hs
+
+menuSave :: IORef AppState -> Gtk.Window -> IO ()
+menuSave s w = do
+    state <- readIORef s
+
+    filename <- saveFileChooserDialog w
+
+    case filename of
+        Nothing -> return ()
+        Just f  -> print f
+
+
+
+menuOpen :: IORef AppState -> Gtk.Window -> IO ()
+menuOpen s w = do
+    state <- readIORef s
+    putStrLn "open"
+
+
+saveFileChooserDialog :: Gtk.Window -> IO (Maybe String)
+saveFileChooserDialog = fileChooserDialog Gtk.FileChooserActionSave
+
+openFileChooserDialog :: Gtk.Window -> IO (Maybe String)
+openFileChooserDialog = fileChooserDialog Gtk.FileChooserActionOpen
+
+fileChooserDialog :: Gtk.FileChooserAction -> Gtk.Window -> IO (Maybe String)
+fileChooserDialog actionType mainWindow = do
+    dlg <- new Gtk.FileChooserDialog [ #title := "Save animation"
+                                     , #action := actionType
+                                     ]
+
+    Gtk.windowSetTransientFor dlg $ Just mainWindow
+    _ <- Gtk.dialogAddButton dlg "gtk-save" $ (toEnum . fromEnum) Gtk.ResponseTypeAccept
+    _ <- Gtk.dialogAddButton dlg "gtk-cancel" $ (toEnum . fromEnum) Gtk.ResponseTypeCancel
+
+    Gtk.widgetShow dlg
+    response <- Gtk.dialogRun dlg
+
+    filename <- Gtk.fileChooserGetFilename dlg
+    Gtk.widgetDestroy dlg
+    return filename
+

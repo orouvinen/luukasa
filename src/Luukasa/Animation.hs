@@ -38,10 +38,10 @@ mkFrameNum :: Int -> FrameNum
 mkFrameNum n = FrameNum $ if n < 0 then 0 else n
 
 data TimeCode = TimeCode
-    { hour   :: Int
-    , minute :: Int
-    , second :: Int
-    , frame  :: Int
+    { _hr  :: Int
+    , _min :: Int
+    , _sec :: Int
+    , _frm :: Int
     }
 
 instance Show a => Show (Animation a) where
@@ -51,12 +51,11 @@ instance Show a => Show (Animation a) where
         ++ show (_currentFrame a) ++ "\n"
         ++ unlines (show <$> toList (_frames a))
 
-
 instance Show TimeCode where
-    show tc = timeDigit (hour tc) ++ ":"
-            ++ timeDigit (minute tc) ++ ":"
-            ++ timeDigit (second tc) ++ ":"
-            ++ frameDigit (frame tc)
+    show tc = timeDigit (_hr tc) ++ ":"
+            ++ timeDigit (_min tc) ++ ":"
+            ++ timeDigit (_sec tc) ++ ":"
+            ++ frameDigit (_frm tc)
       where
         timeDigit x
             | x < 10    = "0" ++ show x
