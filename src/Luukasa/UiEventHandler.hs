@@ -3,12 +3,14 @@
 
 module Luukasa.UiEventHandler where
 
+import qualified Data.ByteString.Lazy as BS (readFile, writeFile)
 import           Data.GI.Base
 import           Data.IORef
 import qualified GI.Gdk               as Gdk
 import qualified GI.Gtk               as Gtk
 -- import qualified GI.Gdk.Objects as GO
 import           Control.Monad        (when)
+import           Data.Aeson
 import           Luukasa.AppState     as ST
 import           Luukasa.EventHandler as E (Event (..), SelectMode (..),
                                             dispatchAction)
@@ -141,25 +143,33 @@ setViewTranslate s trX trY = do
 
     writeIORef s newState
 
--- TODO: get filename from filechooser:
--- https://github.com/haskell-gi/gi-gtk-examples/blob/master/filechooser/FileChooserDemo.hs
 
 menuSave :: IORef AppState -> Gtk.Window -> IO ()
 menuSave s w = do
     state <- readIORef s
-
     filename <- saveFileChooserDialog w
 
     case filename of
         Nothing -> return ()
-        Just f  -> print f
-
+        Just f  -> do
+            let json = encode $ ST.animation state
+            BS.writeFile f json
 
 
 menuOpen :: IORef AppState -> Gtk.Window -> IO ()
 menuOpen s w = do
     state <- readIORef s
-    putStrLn "open"
+    filename <- openFileChooserDialog w
+
+    case filename of
+        Nothing -> return ()
+        Just f -> do
+            json <- BS.readFile f
+            let animation' = decode json
+
+            case animation' of
+                Nothing -> return ()
+                Just a  -> writeIORef s (state { ST.animation = a })
 
 
 saveFileChooserDialog :: Gtk.Window -> IO (Maybe String)

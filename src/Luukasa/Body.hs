@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Luukasa.Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint, createJoint) where
 
 import           Data.Function ((&))
@@ -14,6 +16,9 @@ import qualified Tree          as T (children, create, findNode, findNodeBy,
                                      replaceVal, replaceValBy, setChildValues,
                                      setChildren, setVal, val)
 
+import           Data.Aeson
+import           GHC.Generics
+
 rootJointId :: JointId
 rootJointId = 0
 
@@ -22,7 +27,10 @@ data Body = Body
     , parentLookup :: Map JointId JointId
     , translateX   :: Int
     , translateY   :: Int
-    } deriving Show
+    } deriving (Generic, Show)
+
+instance ToJSON Body
+instance FromJSON Body
 
 create :: Body
 create =

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3eafc03e0b86f36efe960b0e0611e219f5c45322c94747c146accc9546b83bbe
+-- hash: 7fd5faa80d02d1e649ca38f3c2bcab707f3b909401a42048ecf537e1af0781c0
 
 name:           luukasa
 version:        0.1.0.0
@@ -43,7 +43,9 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , containers
     , gi-cairo
     , gi-cairo-connector
@@ -64,7 +66,9 @@ executable luukasa-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , containers
     , gi-cairo
     , gi-cairo-connector
@@ -90,7 +94,9 @@ test-suite luukasa-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
     , containers
     , gi-cairo
     , gi-cairo-connector

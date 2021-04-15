@@ -1,23 +1,27 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Units (Radians, Degrees, mkRadians, mkDegrees, deg, getDegrees, rad, getRadians) where
+module Units
+    ( Radians
+    , Degrees
+    , mkRadians
+    , mkDegrees
+    , deg
+    , getDegrees
+    , rad
+    , getRadians
+    ) where
 
+import           Data.Aeson
 import           Data.Fixed (mod')
 
 newtype Radians = Radians { getRadians :: Double } deriving (Show, Num, Ord, Eq)
-newtype Degrees = Degrees { getDegrees :: Double } deriving (Show, Num, Ord, Eq)
+newtype Degrees = Degrees { getDegrees :: Double } deriving (Show, Num, Ord, Eq, FromJSON, ToJSON)
 
 mkDegrees :: Double -> Degrees
-mkDegrees d = Degrees $ fixDegrees d
-    where fixDegrees x
-            | x >= 360 || x < 0 = mod' x 360
-            | otherwise         = x
+mkDegrees d = Degrees $ mod' d 360
 
 mkRadians :: Double -> Radians
-mkRadians r = Radians $ fixRadians r
-    where fixRadians x
-            | x >= pi * 2 || x < 0  = mod' x (pi * 2)
-            | otherwise             = x
+mkRadians r = Radians $ mod' r (pi * 2)
 
 deg :: Radians -> Degrees
 deg (Radians r) = Degrees $ r * 180 / pi

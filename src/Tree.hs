@@ -2,7 +2,9 @@
     A generic tree implementation, but still with a primary goal of supporting the needs of
     the Luukasa application first and foremost.
 -}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Tree
     ( Tree
@@ -23,8 +25,12 @@ module Tree
     ) where
 
 
-import           Data.List  (find, intersperse)
-import           Data.Maybe (catMaybes)
+import           Data.Aeson
+import           Data.Foldable (foldl')
+import           Data.List     (find, intersperse)
+import           Data.Maybe    (catMaybes)
+import           GHC.Generics
+import           Luukasa.Joint (Joint)
 
 data Tree a
     = Empty
@@ -34,8 +40,10 @@ data Tree a
         , uniqueAncestorId :: Int      -- ^ The sibling number of the root's direct child this node is descendant of
         , siblingId        :: Int      -- ^ Node's own sibling num (X)
         , depth            :: Int      -- ^ Node's depth (Y)
-        } deriving (Functor, Foldable, Traversable)
+        } deriving (Generic, Functor, Foldable, Traversable)
 
+instance FromJSON a => FromJSON (Tree a)
+instance ToJSON a => ToJSON (Tree a)
 
 instance Eq (Tree a) where
     (==) Empty Empty    = True
@@ -64,7 +72,7 @@ setChildren node xs = node { _children = xs }
 -- nodes needn't be guaranteed to stay the same.
 setChildValues :: Eq a => Tree a -> [a] -> Tree a
 setChildValues node xs =
-    let children' = foldl (\ns n ->
+    let children' = foldl' (\ns n ->
             let matchingChild = find (== _val n) xs
             in case matchingChild of
                 Nothing -> ns

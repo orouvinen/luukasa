@@ -31,7 +31,8 @@ dependencies:
 - gi-glib
 - gi-cairo-render
 - gi-cairo-connector
-
+- aeson
+- bytestring
 
 library:
   source-dirs: src

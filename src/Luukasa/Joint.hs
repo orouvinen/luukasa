@@ -1,7 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Luukasa.Joint where
 
-import           Calc  (angle, distance, rotd)
-import           Units (Degrees, getDegrees, getRadians, rad)
+import           Calc         (angle, distance, rotd)
+import           Data.Aeson
+import           GHC.Generics
+import           Units        (Degrees, getDegrees, getRadians, rad)
 
 type JointId = Int
 
@@ -22,10 +25,13 @@ data Joint = Joint
     , jointLocalRot :: Degrees -- ^ Rotation around parent joint
     , jointWorldRot :: Degrees -- ^ Rotation on screen
     , jointR        :: Double --  ^ Distance (radius for rotation) to parent
-    } deriving Show
+    } deriving (Generic, Show)
 
 instance Eq Joint where
     a == b = jointId a == jointId b
+
+instance ToJSON Joint
+instance FromJSON Joint
 
 {- |
 Used to keep joint's geometric relation to its parent in check

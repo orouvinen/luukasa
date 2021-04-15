@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Luukasa.Animation
     ( Animation
@@ -19,15 +20,19 @@ module Luukasa.Animation
     , deleteCurrentFrame
     ) where
 
+import           Data.Aeson
 import           Data.Foldable (toList)
 import           Data.Sequence (Seq, (<|), (|>))
 import qualified Data.Sequence as Seq
-
+import           GHC.Generics
 data Animation a = Animation
     { _frames       :: Seq a
     , _currentFrame :: Int
     , _fps          :: Int
-    } deriving Functor
+    } deriving (Generic, Functor)
+
+instance ToJSON a => ToJSON (Animation a)
+instance FromJSON a => FromJSON (Animation a)
 
 newtype FrameNum = FrameNum Int
 
