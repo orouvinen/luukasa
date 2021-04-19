@@ -27,6 +27,7 @@ data Event
     | DeleteFrame
     | FrameStep Int
 
+-- TODO: define this elsewhere. Main has to import it from here and ideally Main doesn't import anything from this layer.
 type ErrorMessage = T.Text
 
 dispatchAction :: ST.AppState -> Event -> Either ErrorMessage ST.AppState

@@ -17,7 +17,7 @@ import qualified Tree          as T (children, create, findNode, findNodeBy,
                                      setChildren, setVal, val)
 
 import           Data.Aeson
-import           GHC.Generics
+import           GHC.Generics  (Generic)
 
 rootJointId :: JointId
 rootJointId = 0

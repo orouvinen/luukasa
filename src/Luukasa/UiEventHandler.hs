@@ -3,68 +3,68 @@
 
 module Luukasa.UiEventHandler where
 
-import qualified Data.ByteString.Lazy as BS (readFile, writeFile)
-import           Data.GI.Base
-import           Data.IORef
-import qualified GI.Gdk               as Gdk
-import qualified GI.Gtk               as Gtk
--- import qualified GI.Gdk.Objects as GO
-import           Control.Monad        (when)
-import           Data.Aeson
-import           Luukasa.AppState     as ST
-import           Luukasa.EventHandler as E (Event (..), SelectMode (..),
-                                            dispatchAction)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Aeson             (decode, encode)
+import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
+import           Data.GI.Base           (AttrOp ((:=)), new)
+import qualified GI.Gdk                 as Gdk
+import qualified GI.Gtk                 as Gtk
+import           Luukasa.AppState       as ST
+import           Luukasa.Event.Keyboard
+import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
+                                         clickPos, getScrollDirection,
+                                         motionModifiers, motionPos)
+import           Luukasa.EventHandler   as E (ErrorMessage, Event (..),
+                                              SelectMode (..), dispatchAction)
 
-updateAppState :: Show a => IORef AppState -> Either a AppState -> IO ()
-updateAppState stateRef result =
+updateAppState :: HasAppState m => Either a AppState -> m ()
+updateAppState result = do
     case result of
-        Left err       -> print err
-        Right newState -> writeIORef stateRef newState
+        Left _         -> return ()
+        Right newState -> put newState
 
-canvasPrimaryMouseButtonClick :: IORef AppState -> Gdk.EventButton -> IO ()
-canvasPrimaryMouseButtonClick s e = do
-    appState <- readIORef s
 
-    x <- truncate <$> Gdk.getEventButtonX e
-    y <- truncate <$> Gdk.getEventButtonY e
+canvasPrimaryMouseButtonClick :: (HasAppState m, HasMouseEvent m) => Gdk.EventButton -> m (Either ErrorMessage AppState)
+canvasPrimaryMouseButtonClick e = do
+    appState <- get
 
-    ctrlPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeControlMask)
+    (x', y') <- clickPos e
+    let x = truncate x'
+        y = truncate y'
+
+    ctrlPressed <- elem Gdk.ModifierTypeControlMask <$> clickModifiers e
 
     let dispatch = dispatchAction appState
-        applyResult = updateAppState s
         result = case actionState appState of
             PlacingNewJoint -> dispatch $ E.CreateJoint x y
             Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
             _               -> Right appState
 
-    applyResult result
+    updateAppState result
+    return result
 
-canvasPrimaryMouseButtonRelease :: IORef AppState -> Gdk.EventButton -> IO ()
-canvasPrimaryMouseButtonRelease s e = do
-    appState <- readIORef s
+canvasPrimaryMouseButtonRelease :: HasAppState m => Gdk.EventButton -> m ()
+canvasPrimaryMouseButtonRelease e = do
+    appState <- get
 
-    let newState = appState { actionState = Idle }
-
-    writeIORef s newState
+    put appState { actionState = Idle }
 
 
-canvasKeyPress :: IORef AppState -> Gdk.EventKey -> IO ()
-canvasKeyPress s eventKey = do
-    appState <- readIORef s
-
-    key <- Gdk.getEventKeyKeyval eventKey >>= Gdk.keyvalToUpper
+canvasKeyPress :: (HasAppState m, HasKeyEvent m) => Gdk.EventKey -> m ()
+canvasKeyPress eventKey = do
+    appState <- get
+    key <- getKey eventKey
 
     -- print $ actionState appState
 
     let dispatch = dispatchAction appState
-        applyResult = updateAppState s
-        debugJoints = printJoints appState
-        debugState = printState appState
+    --     debugJoints = printJoints appState
+    --     debugState = printState appState
 
-    putStr $ case key of
-        Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
-        Gdk.KEY_2 -> "STATE: " ++ debugState
-        _         -> ""
+    -- liftIO $ putStr $ case key of
+    --     Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
+    --     Gdk.KEY_2 -> "STATE: " ++ debugState
+    --     _         -> ""
 
     let result = case key of
             Gdk.KEY_J       ->
@@ -80,15 +80,15 @@ canvasKeyPress s eventKey = do
             Gdk.KEY_Right       -> dispatch $ E.FrameStep 1
             _                   -> Right appState
 
-    applyResult result
+    updateAppState result
 
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
 
-canvasScrollWheel :: IORef AppState -> Gdk.EventScroll -> IO ()
-canvasScrollWheel s eventScroll = do
-    appState <- readIORef s
-    scrollDirection <- Gdk.getEventScrollDirection eventScroll
+canvasScrollWheel :: (HasAppState m, HasMouseEvent m) => Gdk.EventScroll -> m ()
+canvasScrollWheel eventScroll = do
+    appState <- get
+    scrollDirection <- getScrollDirection eventScroll
 
     let scaleChange =
             if scrollDirection == Gdk.ScrollDirectionDown
@@ -96,22 +96,18 @@ canvasScrollWheel s eventScroll = do
             else scrollWheelScaleStep
 
     let newState = appState { viewScale = viewScale appState + scaleChange }
-    writeIORef s newState
+    put newState
 
+canvasMouseMotion :: (HasAppState m, HasMouseEvent m) => Gdk.EventMotion -> m (Either ErrorMessage AppState)
+canvasMouseMotion e = do
+    appState <- get
 
-canvasMouseMotion :: IORef AppState -> Gdk.EventMotion -> IO ()
-canvasMouseMotion s e = do
-    appState <- readIORef s
-
-    mouseBtnPressed <- e `Gdk.get` #state >>= (return . elem Gdk.ModifierTypeButton1Mask)
-
-    let applyResult = updateAppState s
+    mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
 
     if not mouseBtnPressed || selectionSize appState /= 1
-        then return ()
+        then return $ Right appState
         else do
-            mouseX <- e `Gdk.get` #x
-            mouseY <- e `Gdk.get` #y
+            (mouseX, mouseY) <- motionPos e
 
             let dragState =
                     if selectionSize appState == 0
@@ -125,60 +121,57 @@ canvasMouseMotion s e = do
                     DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
             let result = E.dispatchAction appState { actionState = dragState } action
-            applyResult result
+            updateAppState result
+            return result
 
-setViewScale :: IORef AppState -> Double -> IO ()
-setViewScale s scaleFactor = do
-    state <- readIORef s
+setViewScale :: HasAppState m => Double -> m ()
+setViewScale scaleFactor = do
+    state <- get
+    put state { viewScale = scaleFactor }
 
-    let newState = state { viewScale = scaleFactor }
+setViewTranslate :: HasAppState m => Double -> Double -> m ()
+setViewTranslate trX trY = do
+    state <- get
+    put state { translateX = trX, translateY = trY }
 
-    writeIORef s newState
-
-setViewTranslate :: IORef AppState -> Double -> Double -> IO ()
-setViewTranslate s trX trY = do
-    state <- readIORef s
-
-    let newState = state { translateX = trX, translateY = trY }
-
-    writeIORef s newState
-
-
-menuSave :: IORef AppState -> Gtk.Window -> IO ()
-menuSave s w = do
-    state <- readIORef s
+-- TODO constraints
+-- HasAnimation, MonadFileIO
+-- Same for menuOpen
+menuSave :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
+menuSave w = do
+    state <- get
     filename <- saveFileChooserDialog w
 
     case filename of
         Nothing -> return ()
         Just f  -> do
             let json = encode $ ST.animation state
-            BS.writeFile f json
+            liftIO $ BS.writeFile f json
 
 
-menuOpen :: IORef AppState -> Gtk.Window -> IO ()
-menuOpen s w = do
-    state <- readIORef s
+menuOpen :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
+menuOpen w = do
+    state <- get
     filename <- openFileChooserDialog w
 
     case filename of
         Nothing -> return ()
         Just f -> do
-            json <- BS.readFile f
+            json <- liftIO $ BS.readFile f
             let animation' = decode json
 
             case animation' of
                 Nothing -> return ()
-                Just a  -> writeIORef s (state { ST.animation = a })
+                Just a  -> put state { ST.animation = a }
 
 
-saveFileChooserDialog :: Gtk.Window -> IO (Maybe String)
+saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe String)
 saveFileChooserDialog = fileChooserDialog Gtk.FileChooserActionSave
 
-openFileChooserDialog :: Gtk.Window -> IO (Maybe String)
+openFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe String)
 openFileChooserDialog = fileChooserDialog Gtk.FileChooserActionOpen
 
-fileChooserDialog :: Gtk.FileChooserAction -> Gtk.Window -> IO (Maybe String)
+fileChooserDialog :: MonadIO m => Gtk.FileChooserAction -> Gtk.Window -> m (Maybe String)
 fileChooserDialog actionType mainWindow = do
     dlg <- new Gtk.FileChooserDialog [ #title := "Save animation"
                                      , #action := actionType
@@ -189,7 +182,7 @@ fileChooserDialog actionType mainWindow = do
     _ <- Gtk.dialogAddButton dlg "gtk-cancel" $ (toEnum . fromEnum) Gtk.ResponseTypeCancel
 
     Gtk.widgetShow dlg
-    response <- Gtk.dialogRun dlg
+    _ <- Gtk.dialogRun dlg
 
     filename <- Gtk.fileChooserGetFilename dlg
     Gtk.widgetDestroy dlg
