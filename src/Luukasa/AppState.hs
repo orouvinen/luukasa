@@ -25,6 +25,10 @@ defaultFps = 24
 initialAnimation :: Animation Body
 initialAnimation = A.appendFrame (A.mkAnimation defaultFps) B.create
 
+class Monad m => HasAppState m where
+    get :: m AppState
+    put :: AppState -> m ()
+
 data AppState = AppState
     { actionState       :: ActionState
     , animation         :: Animation Body

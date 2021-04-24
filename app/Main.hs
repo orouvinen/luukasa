@@ -1,35 +1,66 @@
-{-# LANGUAGE OverloadedLabels  #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLabels           #-}
+{-# LANGUAGE OverloadedStrings          #-}
 
-module Main where
-
+-- import qualified Data.GI.Base              as GI
 import           Data.GI.Base
 import           Data.IORef
 import           GI.Cairo.Render.Connector (renderWithContext)
-import           GI.Gdk                    as Gdk
+import qualified GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
 
+import           Control.Monad             ((>=>))
+import           Control.Monad.IO.Class    (MonadIO (liftIO))
+import           Control.Monad.Reader      (MonadReader, ReaderT, ask,
+                                            runReaderT)
 import           Luukasa.AppState
+import           Luukasa.Event.Keyboard
+import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
+                                            clickPos, getScrollDirection,
+                                            motionModifiers, motionPos)
+import           Luukasa.EventHandler      (ErrorMessage)
 import qualified Luukasa.Render            as Render
 import qualified Luukasa.UiEventHandler    as EV
 
-windowWidth :: Int
+windowWidth, windowHeight :: Int
 windowWidth = 800
-
-windowHeight :: Int
 windowHeight = 600
+
+newtype EventM a = EventM { runEventM :: ReaderT (IORef AppState) IO a }
+    deriving (Functor, Applicative, Monad, MonadReader (IORef AppState), MonadIO)
+
+instance HasAppState EventM where
+    get = ask >>= liftIO . readIORef
+    put s = ask >>= \stateRef -> liftIO $ writeIORef stateRef s
+
+instance HasKeyEvent EventM where
+    getKey = Gdk.getEventKeyKeyval >=> Gdk.keyvalToUpper
+
+instance HasMouseEvent EventM where
+    getScrollDirection = Gdk.getEventScrollDirection
+    -- eventPos e = (,) <$> (e `Gdk.get` #x) <*> (e `Gdk.get` #y)
+    -- clickPos e = (,) <$> (e `Gdk.get` #x) <*> (e `Gdk.get` #y)
+    clickPos e = (,) <$> Gdk.getEventButtonX e <*> Gdk.getEventButtonY e
+    motionPos e = (,) <$> Gdk.getEventMotionX e <*> Gdk.getEventMotionY e
+    clickModifiers = Gdk.getEventButtonState
+    motionModifiers = Gdk.getEventMotionState
+
+
+
 
 main :: IO ()
 main = do
     _ <- Gtk.init Nothing
-
-    stateRef <- newIORef initialState
-    buildUi stateRef
+    newIORef initialState >>= buildUi
     Gtk.main
 
+runEvent :: IORef AppState -> EventM a -> IO a
+runEvent stateRef handler = runReaderT (runEventM handler) stateRef
 
 buildUi :: IORef AppState -> IO ()
-buildUi state = do
+buildUi stateRef = do
+    let runEventHandler = runEvent stateRef
+
     -- Create main window
     window <- new Gtk.Window [#title := "luukasa-dev"]
     Gtk.widgetSetAppPaintable window True
@@ -40,15 +71,14 @@ buildUi state = do
 
     -- Create drawing area for Cairo rendering
     canvas <- Gtk.drawingAreaNew
-    _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render state)
+    _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
     Gtk.widgetSetSizeRequest canvas (fromIntegral windowWidth) (fromIntegral windowHeight)
 
     -- Event handling for drawing area
     _ <- Gtk.onWidgetScrollEvent canvas $ \ev -> do
-        _ <- EV.canvasScrollWheel state ev
+        runEventHandler $ EV.canvasScrollWheel ev
         Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         return True
-
 
     Gtk.widgetAddEvents canvas
         [ Gdk.EventMaskButtonPressMask
@@ -62,7 +92,10 @@ buildUi state = do
         button <- fromIntegral <$> ev `Gdk.get` #button
 
         case button of
-            Gdk.BUTTON_PRIMARY -> EV.canvasPrimaryMouseButtonClick state ev
+            Gdk.BUTTON_PRIMARY -> do
+                                    res <- runEventHandler $ EV.canvasPrimaryMouseButtonClick ev
+                                    -- TODO handle result
+                                    return ()
             _                  -> return ()
 
         Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
@@ -72,7 +105,7 @@ buildUi state = do
         button <- fromIntegral <$> ev `Gdk.get` #button
 
         case button of
-            Gdk.BUTTON_PRIMARY -> EV.canvasPrimaryMouseButtonRelease state ev
+            Gdk.BUTTON_PRIMARY -> runEventHandler $ EV.canvasPrimaryMouseButtonRelease ev
             _                  -> return ()
 
         Gtk.widgetQueueDraw canvas
@@ -88,17 +121,18 @@ buildUi state = do
     source: https://gtk-d.dpldocs.info/gtk.DrawingArea.DrawingArea.html
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
-        EV.canvasKeyPress state ev
+        runEventHandler $ EV.canvasKeyPress ev
         --Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         Gtk.widgetQueueDraw canvas
         return False
 
     _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
-        EV.canvasMouseMotion state ev
+        res <- runEventHandler $ EV.canvasMouseMotion ev
+        -- TODO: handle result
         Gtk.widgetQueueDraw canvas
         return True
 
-    menuBar <- buildMenuBar state window
+    menuBar <- buildMenuBar stateRef window
 
     -- Put all the parts together
     Gtk.gridAttach grid canvas 0 1 1 1
@@ -116,12 +150,12 @@ buildUi state = do
     -}
     width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
     height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
-    _ <- EV.setViewTranslate state (width' / 2) (height' / 2)
+    _ <- runEventHandler $ EV.setViewTranslate (width' / 2) (height' / 2)
 
     return ()
 
 buildMenuBar :: IORef AppState -> Gtk.Window -> IO Gtk.MenuBar
-buildMenuBar s window = do
+buildMenuBar stateRef window = do
     menuBar <- Gtk.menuBarNew
 
     -- Create menu items
@@ -133,9 +167,9 @@ buildMenuBar s window = do
 
     -- Attach actions
 
-    Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    Gtk.onMenuItemActivate fileSave $ EV.menuSave s window
-    Gtk.onMenuItemActivate fileOpen $ EV.menuOpen s window
+    _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
+    _ <- Gtk.onMenuItemActivate fileSave $ runEvent stateRef (EV.menuSave window)
+    _ <- Gtk.onMenuItemActivate fileOpen $ runEvent stateRef (EV.menuOpen window)
 
 
     -- "File" menu

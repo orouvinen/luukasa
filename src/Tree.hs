@@ -4,7 +4,6 @@
 -}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Tree
     ( Tree
@@ -30,7 +29,6 @@ import           Data.Foldable (foldl')
 import           Data.List     (find, intersperse)
 import           Data.Maybe    (catMaybes)
 import           GHC.Generics
-import           Luukasa.Joint (Joint)
 
 data Tree a
     = Empty
