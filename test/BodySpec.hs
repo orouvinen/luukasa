@@ -47,6 +47,6 @@ spec = do
             (30, 20) `elem` res `shouldBe` True
 
         it "adding joints updates parent lookup" $ do
-            B.getParent testBody 1 `shouldSatisfy` (\j -> jointId j == 0)
-            B.getParent testBody 2 `shouldSatisfy` (\j -> jointId j == 0)
-            B.getParent testBody 3 `shouldSatisfy` (\j -> jointId j == 1)
+            B.getParentUnsafe testBody 1 `shouldSatisfy` (\j -> jointId j == 0)
+            B.getParentUnsafe testBody 2 `shouldSatisfy` (\j -> jointId j == 0)
+            B.getParentUnsafe testBody 3 `shouldSatisfy` (\j -> jointId j == 1)

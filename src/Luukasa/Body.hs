@@ -1,9 +1,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Luukasa.Body (Body(..), create, jointPositions, limbSegments, rootJointId, getParent, rotateJoint, addJoint, moveJoint, createJoint) where
+module Luukasa.Body (Body(..), create, jointPositions, limbSegments, getParentUnsafe, rootJointId, rotateJoint, addJoint, moveJoint, createJoint) where
 
 import           Data.Function ((&))
-import           Data.List
+import           Data.List     (foldl')
 
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
@@ -16,8 +16,8 @@ import qualified Tree          as T (children, create, findNode, findNodeBy,
                                      replaceVal, replaceValBy, setChildValues,
                                      setChildren, setVal, val)
 
-import           Data.Aeson
-import           GHC.Generics
+import           Data.Aeson    (FromJSON, ToJSON)
+import           GHC.Generics  (Generic)
 
 rootJointId :: JointId
 rootJointId = 0
@@ -52,7 +52,7 @@ create =
 
 rotateJoint :: JointLockMode -> Double -> Joint -> Body -> Body
 rotateJoint lockMode deg joint body =
-    let parent = getParent body (J.jointId joint)
+    let parent = getParentUnsafe body (J.jointId joint)
         originalX = J.jointX joint
         originalY = J.jointY joint
 
@@ -98,12 +98,12 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
 
 moveJoint :: Double -> Double -> Joint -> Body -> Body
 moveJoint x y joint body =
-    let parent = getParent body (J.jointId joint)
+    let parent = getParentUnsafe body (J.jointId joint)
         jointNode = fromJust $ T.findNode joint (root body)
         children = T.children jointNode
 
         translatedJoint = joint { J.jointX = x, J.jointY = y }
-        newJoint = if isRoot body joint
+        newJoint = if isRoot joint
                    then translatedJoint
                    else J.setChildAngleAndRadius parent translatedJoint
 
@@ -119,8 +119,8 @@ moveJoint x y joint body =
         }
 
 
-isRoot :: Body -> Joint -> Bool
-isRoot body joint = isNothing $ Map.lookup (J.jointId joint) (parentLookup body)
+isRoot :: Joint -> Bool
+isRoot j = J.jointId j /= rootJointId
 
 addJoint :: Body -> Joint -> Joint -> Body
 addJoint body parent joint = body
@@ -128,9 +128,8 @@ addJoint body parent joint = body
     , parentLookup = Map.insert (J.jointId joint) (J.jointId parent) (parentLookup body)
     }
 
--- TODO:this is unsafe in more than one way. (`!` and `fromJust`)
-getParent :: Body -> JointId -> Joint
-getParent body jointId =
+getParentUnsafe :: Body -> JointId -> Joint
+getParentUnsafe body jointId =
     let parentId = parentLookup body ! jointId
         parentJoint = fromJust $ T.findNodeBy (\j -> J.jointId j == parentId) (root body)
         in T.val parentJoint

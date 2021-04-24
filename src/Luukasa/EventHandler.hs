@@ -58,9 +58,10 @@ dispatchAction s e =
                 Nothing      -> Right s -- TODO
 
         RotateSelected deg ->
-            let rotatees = T.val <$> mapMaybe
+            let nonRootJoints = filter (/= B.rootJointId) (ST.selectedJointIds s)
+                rotatees = T.val <$> mapMaybe
                     (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
-                    (ST.selectedJointIds s)
+                    nonRootJoints
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
                 body' = foldl' (&) body rotateActions
             in Right s { ST.animation = A.setCurrentFrameData animation body' }
