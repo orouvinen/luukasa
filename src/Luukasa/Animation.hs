@@ -4,6 +4,7 @@
 module Luukasa.Animation
     ( Animation
     , FrameNum
+    , fps
     , mkFrameNum
     , mkAnimation
     , currentFrameNum
@@ -75,6 +76,9 @@ mkAnimation fps = Animation
     , _currentFrame = 0
     , _fps = fps
     }
+
+fps :: Animation a -> Int
+fps = _fps
 
 currentFrameNum :: Animation a -> FrameNum
 currentFrameNum = FrameNum . _currentFrame

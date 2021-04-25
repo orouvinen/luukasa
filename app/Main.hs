@@ -2,24 +2,26 @@
 {-# LANGUAGE OverloadedLabels           #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
--- import qualified Data.GI.Base              as GI
-import           Data.GI.Base
-import           Data.IORef
+import           Data.GI.Base              (AttrOp ((:=)), new, on)
+import           Data.IORef                (IORef, newIORef, readIORef,
+                                            writeIORef)
 import           GI.Cairo.Render.Connector (renderWithContext)
 import qualified GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
 
-import           Control.Monad             ((>=>))
+import           Control.Monad             (when, (>=>))
 import           Control.Monad.IO.Class    (MonadIO (liftIO))
 import           Control.Monad.Reader      (MonadReader, ReaderT, ask,
                                             runReaderT)
-import           Luukasa.AppState
+import           Data.Maybe                (fromJust)
+import           Luukasa.AppState          (ActionState (..), AppState,
+                                            HasAppState, actionState, get,
+                                            initialState, put)
 import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
                                             clickPos, getScrollDirection,
                                             motionModifiers, motionPos)
-import           Luukasa.EventHandler      (ErrorMessage)
-import qualified Luukasa.Render            as Render
+import qualified Luukasa.Render            as Render (render)
 import qualified Luukasa.UiEventHandler    as EV
 
 windowWidth, windowHeight :: Int
@@ -122,9 +124,35 @@ buildUi stateRef = do
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
         runEventHandler $ EV.canvasKeyPress ev
+        key <- Gdk.getEventKeyKeyval ev
+
+        when (key == Gdk.KEY_space) $ do
+            appState <- readIORef stateRef
+            case actionState appState of
+                AnimationPlayback callbackId -> do
+                    runEventHandler EV.stopPlayback
+                    Gtk.widgetRemoveTickCallback canvas callbackId
+                    putStrLn "playback stopped"
+
+                Idle -> do
+                    tickCallbackId <- Gtk.widgetAddTickCallback canvas (\ _ frameClock -> do
+                        -- Gdk.frameClockGetFrameTime frameClock >>= runEventHandler . EV.playbackTick
+                        timestamp <- Gdk.frameClockGetFrameTime frameClock
+                        needsRedraw <- runEventHandler $ EV.playbackTick timestamp
+                        when needsRedraw $ Gtk.widgetQueueDraw canvas
+                        return True)
+                    {- Unrealized widgets don't have a frame clock, hence the Maybe return value and
+                       having to use fromJust like it was nothing. (Pun maybe intended.)
+                    -}
+                    frameClock <- fromJust <$> Gtk.widgetGetFrameClock canvas
+                    timestamp <- Gdk.frameClockGetFrameTime frameClock
+                    runEventHandler $ EV.startPlayback tickCallbackId timestamp
+                _ -> return ()
+            return ()
+
         --Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         Gtk.widgetQueueDraw canvas
-        return False
+        return True
 
     _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
         res <- runEventHandler $ EV.canvasMouseMotion ev

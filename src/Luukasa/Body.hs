@@ -7,7 +7,7 @@ import           Data.List     (foldl')
 
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
-import           Data.Maybe    (fromJust, isNothing)
+import           Data.Maybe    (fromJust)
 import           Luukasa.Joint (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint as J
 import           Tree          (Tree)
@@ -120,7 +120,7 @@ moveJoint x y joint body =
 
 
 isRoot :: Joint -> Bool
-isRoot j = J.jointId j /= rootJointId
+isRoot j = J.jointId j == rootJointId
 
 addJoint :: Body -> Joint -> Joint -> Body
 addJoint body parent joint = body

@@ -5,6 +5,7 @@ import           Data.Foldable       (foldl')
 import           Data.Function       ((&))
 import           Data.Maybe          (mapMaybe)
 import qualified Data.Text           as T
+import           Luukasa.Common
 
 import qualified Luukasa.Animation   as A
 import qualified Luukasa.AppState    as ST
@@ -26,9 +27,6 @@ data Event
     | CreateFrame
     | DeleteFrame
     | FrameStep Int
-
--- TODO: define this elsewhere. Main has to import it from here and ideally Main doesn't import anything from this layer.
-type ErrorMessage = T.Text
 
 dispatchAction :: ST.AppState -> Event -> Either ErrorMessage ST.AppState
 dispatchAction s e =
@@ -56,13 +54,13 @@ dispatchAction s e =
                                             Set -> [jointId]
                                             Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
                     in Right s { ST.selectedJointIds = selectedJointIds }
-                Nothing      -> Right s -- TODO
+                Nothing      -> Right s
 
         RotateSelected deg ->
-            let nonRootJoints = filter (/= B.rootJointId) (ST.selectedJointIds s)
+            let nonRootJointIds = filter (/= B.rootJointId) (ST.selectedJointIds s)
                 rotatees = T.val <$> mapMaybe
                     (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
-                    nonRootJoints
+                    nonRootJointIds
                 rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
                 body' = foldl' (&) body rotateActions
             in Right s { ST.animation = A.setCurrentFrameData animation body' }
@@ -89,4 +87,3 @@ dispatchAction s e =
         DeleteFrame -> Right s { ST.animation = A.deleteCurrentFrame animation }
 
         FrameStep n -> Right s { ST.animation = A.frameStep animation n }
-

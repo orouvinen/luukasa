@@ -3,18 +3,20 @@ module Luukasa.AppState where
 import           Data.Foldable     (toList)
 import qualified Data.Text         as T
 
+import           Data.Word         (Word32)
 import           Luukasa.Animation (Animation)
 import qualified Luukasa.Animation as A
 import           Luukasa.Body      (Body)
 import qualified Luukasa.Body      as B
+import           Luukasa.Common
 import           Luukasa.Joint     (JointId, JointLockMode (..))
 
+data DragState = DragSelected DragMode | DragSelectionRect deriving Show
 data ActionState
     = Idle
     | PlacingNewJoint
-    | DragSelected DragMode
-    | DragSelectionRect
-    | AnimationPlayBack
+    | Drag DragState
+    | AnimationPlayback Word32
     deriving Show
 
 data DragMode = DragMove | DragRotate deriving Show
@@ -40,6 +42,7 @@ data AppState = AppState
     , selectedJointIds  :: [JointId]
     , jointLockMode     :: JointLockMode
     , dragMode          :: DragMode
+    , frameStart        :: Maybe TimestampUs
     } deriving (Show)
 
 initialState :: AppState
@@ -54,7 +57,13 @@ initialState = AppState
     , translateY = 0
     , jointLockMode = Rotate
     , dragMode = DragMove
+    , frameStart = Nothing
     }
+
+isPlaybackOn :: AppState -> Bool
+isPlaybackOn s = case actionState s of
+    AnimationPlayback _ -> True
+    _                   -> False
 
 selectionSize :: AppState -> Int
 selectionSize = length . selectedJointIds

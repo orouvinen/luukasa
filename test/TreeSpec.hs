@@ -56,7 +56,7 @@ Test tree:
                     `shouldBe` 1
 
             it "doesn't insert with non-existing parent" $ do
-                length l1_child_2 `shouldBe` 3
+                length noInsert `shouldBe` 3
 
         describe "delete" $ do
             let res = T.delete (\x -> T.val x == "L2 child1") deleteTestTree

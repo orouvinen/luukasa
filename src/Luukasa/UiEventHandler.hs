@@ -3,19 +3,23 @@
 
 module Luukasa.UiEventHandler where
 
+import           Control.Monad          (when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
 import           Data.GI.Base           (AttrOp ((:=)), new)
+import           Data.Maybe             (fromJust)
 import qualified GI.Gdk                 as Gdk
 import qualified GI.Gtk                 as Gtk
+import           Luukasa.Animation
 import           Luukasa.AppState       as ST
+import           Luukasa.Common
 import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
                                          clickPos, getScrollDirection,
                                          motionModifiers, motionPos)
-import           Luukasa.EventHandler   as E (ErrorMessage, Event (..),
-                                              SelectMode (..), dispatchAction)
+import           Luukasa.EventHandler   as E (Event (..), SelectMode (..),
+                                              dispatchAction)
 
 updateAppState :: HasAppState m => Either a AppState -> m ()
 updateAppState result = do
@@ -43,12 +47,44 @@ canvasPrimaryMouseButtonClick e = do
     updateAppState result
     return result
 
+
 canvasPrimaryMouseButtonRelease :: HasAppState m => Gdk.EventButton -> m ()
-canvasPrimaryMouseButtonRelease e = do
+canvasPrimaryMouseButtonRelease _ = do
     appState <- get
 
-    put appState { actionState = Idle }
+    if isPlaybackOn appState
+        then return ()
+        else put appState { actionState = Idle }
 
+startPlayback :: HasAppState m => TimerCallbackId -> TimestampUs -> m ()
+startPlayback timerCallbackId timestamp = do
+    appState <- get
+    put appState { actionState = AnimationPlayback timerCallbackId
+                 , frameStart = Just timestamp
+                 }
+
+stopPlayback :: HasAppState m => m ()
+stopPlayback = do
+    appState <- get
+    put appState { actionState = Idle
+                 , frameStart = Nothing
+                 }
+
+playbackTick :: HasAppState m => TimestampUs -> m Bool
+playbackTick timestamp = do
+    s <- get
+    let frameIntervalUs = (1.0 / (fromIntegral (fps $ animation s) :: Double)) * 1000 * 1000
+        lastFrame = fromJust (ST.frameStart s)
+        sinceLastFrame = timestamp - lastFrame
+        renderNeeded = fromIntegral sinceLastFrame >= frameIntervalUs
+
+    when renderNeeded $ do
+        -- timestamp might not be totally accurate for frameStart if
+        -- this frame is delayed. Should probably set the originally intended frameStart?
+        let result = dispatchAction s { frameStart = Just timestamp } (E.FrameStep 1)
+        updateAppState result
+
+    return renderNeeded
 
 canvasKeyPress :: (HasAppState m, HasKeyEvent m) => Gdk.EventKey -> m ()
 canvasKeyPress eventKey = do
@@ -120,7 +156,7 @@ canvasMouseMotion e = do
                     -- Just a placeholder for now
                     DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
-            let result = E.dispatchAction appState { actionState = dragState } action
+            let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
             updateAppState result
             return result
 
@@ -134,9 +170,6 @@ setViewTranslate trX trY = do
     state <- get
     put state { translateX = trX, translateY = trY }
 
--- TODO constraints
--- HasAnimation, MonadFileIO
--- Same for menuOpen
 menuSave :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
 menuSave w = do
     state <- get

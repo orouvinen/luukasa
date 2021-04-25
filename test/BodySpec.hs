@@ -1,22 +1,28 @@
 
 {-# LANGUAGE ExtendedDefaultRules #-}
 module BodySpec (spec) where
-import           Data.Maybe
 import           Test.Hspec
 
 import qualified Luukasa.Body  as B
-import           Luukasa.Joint
+import           Luukasa.Joint (Joint (Joint))
+import qualified Luukasa.Joint as J
 import qualified Tree          as T
 
 mkJointAt :: Int -> Double -> Double -> Joint
-mkJointAt jointId x y = Joint { jointId = jointId, jointX = x, jointY = y, jointLocalRot = 0, jointWorldRot = 0, jointR = 0 }
+mkJointAt jointId x y = Joint
+    { J.jointId = jointId
+    , J.jointX = x
+    , J.jointY = y
+    , J.jointLocalRot = 0
+    , J.jointWorldRot = 0
+    , J.jointR = 0
+    }
 
 
 spec :: Spec
 spec = do
-    -- Root joint
-    let j0 = mkJointAt 0 0 0
-    -- First "row" of joints; siblings at Y=10
+
+    -- First "row" of joints; siblings at Y=10. (Root joint will be created with Body.create.)
     let j1 = mkJointAt 1 10 10
     let j2 = mkJointAt 2 20 10
     -- Second row, child of jointId 1
@@ -47,6 +53,6 @@ spec = do
             (30, 20) `elem` res `shouldBe` True
 
         it "adding joints updates parent lookup" $ do
-            B.getParentUnsafe testBody 1 `shouldSatisfy` (\j -> jointId j == 0)
-            B.getParentUnsafe testBody 2 `shouldSatisfy` (\j -> jointId j == 0)
-            B.getParentUnsafe testBody 3 `shouldSatisfy` (\j -> jointId j == 1)
+            B.getParentUnsafe testBody 1 `shouldSatisfy` (\j -> J.jointId j == 0)
+            B.getParentUnsafe testBody 2 `shouldSatisfy` (\j -> J.jointId j == 0)
+            B.getParentUnsafe testBody 3 `shouldSatisfy` (\j -> J.jointId j == 1)
