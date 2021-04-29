@@ -8,6 +8,7 @@ import           Data.IORef                (IORef, newIORef, readIORef,
 import           GI.Cairo.Render.Connector (renderWithContext)
 import qualified GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
+import qualified GI.Gtk.Objects            as GO
 
 import           Control.Monad             (when, (>=>))
 import           Control.Monad.IO.Class    (MonadIO (liftIO))
@@ -47,9 +48,6 @@ instance HasMouseEvent EventM where
     clickModifiers = Gdk.getEventButtonState
     motionModifiers = Gdk.getEventMotionState
 
-
-
-
 main :: IO ()
 main = do
     _ <- Gtk.init Nothing
@@ -62,17 +60,28 @@ runEvent stateRef handler = runReaderT (runEventM handler) stateRef
 buildUi :: IORef AppState -> IO ()
 buildUi stateRef = do
     let runEventHandler = runEvent stateRef
+    builder <- GO.builderNew
+    GO.builderAddFromFile builder "ui/main.glade"
 
-    -- Create main window
-    window <- new Gtk.Window [#title := "luukasa-dev"]
-    Gtk.widgetSetAppPaintable window True
-    _ <- on window #destroy Gtk.mainQuit
+    window <- GO.builderGetObject builder "mainWindow" >>= Gtk.unsafeCastTo Gtk.Window . fromJust
+    Gtk.onWidgetDestroy window Gtk.mainQuit
 
-    -- Create layout grid
-    grid <- Gtk.gridNew
+    canvas <- GO.builderGetObject builder "mainCanvas" >>= Gtk.unsafeCastTo Gtk.DrawingArea . fromJust
+    -- grid <- GO.builderGetObject builder "grid" >>= Gtk.unsafeCastTo Gtk.Grid . fromJust
+    -- MenuBar & menu(s) & menu items
+    -- menubar <- GO.builderGetObject builder "menuBar" >>= Gtk.unsafeCastTo Gtk.MenuBar . fromJust
+    -- file <- GO.builderGetObject builder "file" >>= Gtk.unsafeCastTo Gtk.MenuItem . fromJust
+    fileOpen <- GO.builderGetObject builder "fileOpen" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
+    fileSave <- GO.builderGetObject builder "fileSave" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
+    fileQuit <- GO.builderGetObject builder "fileQuit" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
+    -- TODO: load file menu separator item?
 
-    -- Create drawing area for Cairo rendering
-    canvas <- Gtk.drawingAreaNew
+    -- Button bar
+    -- buttonBox <- GO.builderGetObject builder "buttonBox" >>= Gtk.unsafeCastTo Gtk.ButtonBox . fromJust
+    btnPlayback <- GO.builderGetObject builder "btnPlayback" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
+    Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
+
+    -- Event handlers
     _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
     Gtk.widgetSetSizeRequest canvas (fromIntegral windowWidth) (fromIntegral windowHeight)
 
@@ -126,29 +135,7 @@ buildUi stateRef = do
         runEventHandler $ EV.canvasKeyPress ev
         key <- Gdk.getEventKeyKeyval ev
 
-        when (key == Gdk.KEY_space) $ do
-            appState <- readIORef stateRef
-            case actionState appState of
-                AnimationPlayback callbackId -> do
-                    runEventHandler EV.stopPlayback
-                    Gtk.widgetRemoveTickCallback canvas callbackId
-                    putStrLn "playback stopped"
-
-                Idle -> do
-                    tickCallbackId <- Gtk.widgetAddTickCallback canvas (\ _ frameClock -> do
-                        -- Gdk.frameClockGetFrameTime frameClock >>= runEventHandler . EV.playbackTick
-                        timestamp <- Gdk.frameClockGetFrameTime frameClock
-                        needsRedraw <- runEventHandler $ EV.playbackTick timestamp
-                        when needsRedraw $ Gtk.widgetQueueDraw canvas
-                        return True)
-                    {- Unrealized widgets don't have a frame clock, hence the Maybe return value and
-                       having to use fromJust like it was nothing. (Pun maybe intended.)
-                    -}
-                    frameClock <- fromJust <$> Gtk.widgetGetFrameClock canvas
-                    timestamp <- Gdk.frameClockGetFrameTime frameClock
-                    runEventHandler $ EV.startPlayback tickCallbackId timestamp
-                _ -> return ()
-            return ()
+        when (key == Gdk.KEY_space) $ playbackHandler stateRef canvas btnPlayback
 
         --Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         Gtk.widgetQueueDraw canvas
@@ -160,18 +147,13 @@ buildUi stateRef = do
         Gtk.widgetQueueDraw canvas
         return True
 
-    menuBar <- buildMenuBar stateRef window
-
-    -- Put all the parts together
-    Gtk.gridAttach grid canvas 0 1 1 1
-    Gtk.gridAttach grid menuBar 0 0 1 1
-
-    Gtk.containerAdd window grid
+    -- Menu item actions
+    _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
+    _ <- Gtk.onMenuItemActivate fileSave $ runEvent stateRef (EV.menuSave window)
+    _ <- Gtk.onMenuItemActivate fileOpen $ runEvent stateRef (EV.menuOpen window)
 
     Gtk.windowSetPosition window Gtk.WindowPositionCenter
-
-    #showAll window
-
+    Gtk.widgetShowAll window
     {-
         Set up initial view translation so that coordinate (0, 0)
         is rendered at center of the drawing area.
@@ -182,30 +164,34 @@ buildUi stateRef = do
 
     return ()
 
-buildMenuBar :: IORef AppState -> Gtk.Window -> IO Gtk.MenuBar
-buildMenuBar stateRef window = do
-    menuBar <- Gtk.menuBarNew
 
-    -- Create menu items
-    fileMenu <- Gtk.menuNew
-    file <- Gtk.menuItemNewWithMnemonic "_File"
-    fileSave <- Gtk.menuItemNewWithMnemonic "_Save"
-    fileOpen <- Gtk.menuItemNewWithMnemonic "_Open"
-    fileQuit <- Gtk.menuItemNewWithMnemonic "_Quit"
+playbackHandler :: IORef AppState -> Gtk.DrawingArea -> Gtk.Button -> IO ()
+playbackHandler stateRef canvas btnPlayback = do
+    appState <- readIORef stateRef
 
-    -- Attach actions
+    case actionState appState of
+        AnimationPlayback _ -> do Gtk.buttonSetLabel btnPlayback "Play"
+        Idle                -> do Gtk.buttonSetLabel btnPlayback "Stop"
+        _                   -> return ()
 
-    _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    _ <- Gtk.onMenuItemActivate fileSave $ runEvent stateRef (EV.menuSave window)
-    _ <- Gtk.onMenuItemActivate fileOpen $ runEvent stateRef (EV.menuOpen window)
+    let runEventHandler = runEvent stateRef
 
+    case actionState appState of
+        AnimationPlayback callbackId -> do
+            runEventHandler EV.stopPlayback
+            Gtk.widgetRemoveTickCallback canvas callbackId
 
-    -- "File" menu
-    Gtk.menuShellAppend fileMenu fileSave
-    Gtk.menuShellAppend fileMenu fileOpen
-    Gtk.menuShellAppend fileMenu fileQuit
-    Gtk.menuItemSetSubmenu file (Just fileMenu)
-    Gtk.containerAdd menuBar file
-
-    return menuBar
-
+        Idle -> do
+            tickCallbackId <- Gtk.widgetAddTickCallback canvas (\ _ frameClock -> do
+                -- Gdk.frameClockGetFrameTime frameClock >>= runEventHandler . EV.playbackTick
+                timestamp <- Gdk.frameClockGetFrameTime frameClock
+                needsRedraw <- runEventHandler $ EV.playbackTick timestamp
+                when needsRedraw $ Gtk.widgetQueueDraw canvas
+                return True)
+            {- Unrealized widgets don't have a frame clock, hence the Maybe return value and
+                having to use fromJust like it was nothing. (Pun maybe intended.)
+            -}
+            frameClock <- fromJust <$> Gtk.widgetGetFrameClock canvas
+            timestamp <- Gdk.frameClockGetFrameTime frameClock
+            runEventHandler $ EV.startPlayback tickCallbackId timestamp
+        _ -> return ()
