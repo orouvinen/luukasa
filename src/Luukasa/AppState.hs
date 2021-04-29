@@ -3,7 +3,6 @@ module Luukasa.AppState where
 import           Data.Foldable     (toList)
 import qualified Data.Text         as T
 
-import           Data.Word         (Word32)
 import           Luukasa.Animation (Animation)
 import qualified Luukasa.Animation as A
 import           Luukasa.Body      (Body)
@@ -16,7 +15,7 @@ data ActionState
     = Idle
     | PlacingNewJoint
     | Drag DragState
-    | AnimationPlayback Word32
+    | AnimationPlayback TimerCallbackId
     deriving Show
 
 data DragMode = DragMove | DragRotate deriving Show

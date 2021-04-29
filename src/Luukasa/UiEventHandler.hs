@@ -108,8 +108,8 @@ canvasKeyPress eventKey = do
                     then Right appState { actionState = PlacingNewJoint }
                     else Left "No joint selected" -- TODO: this is not the kind of error we're looking for
 
-            Gdk.KEY_Up          -> dispatch $ E.RotateSelected 10
-            Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-10)
+            Gdk.KEY_Up          -> dispatch $ E.RotateSelected 2
+            Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-2)
             Gdk.KEY_KP_Add      -> dispatch E.CreateFrame
             Gdk.KEY_KP_Subtract -> dispatch E.DeleteFrame
             Gdk.KEY_Left        -> dispatch $ E.FrameStep (-1)

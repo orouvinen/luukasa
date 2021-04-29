@@ -28,62 +28,87 @@ data Event
     | DeleteFrame
     | FrameStep Int
 
-dispatchAction :: ST.AppState -> Event -> Either ErrorMessage ST.AppState
+
+type EventResult = Either ErrorMessage ST.AppState
+
+dispatchAction :: ST.AppState -> Event -> EventResult
 dispatchAction s e =
+    case e of
+        CreateJoint x y          -> createJoint s x y
+        TrySelect x y selectMode -> trySelect s x y selectMode
+        RotateSelected deg       -> rotateSelected s deg
+        MoveSelected x y         -> moveSelected s x y
+        ExtendSelectionRect x y  -> Right s
+        DragRotateSelected x y   -> Right s
+        CreateFrame              -> createFrame s
+        DeleteFrame              -> deleteFrame s
+        FrameStep n              -> frameStep s n
+
+createJoint :: ST.AppState -> Int -> Int -> EventResult
+createJoint s x y =
     let animation = ST.animation s
-        body = A.currentFrameData $ ST.animation s
-    in case e of
-        CreateJoint x y ->
-            let newJointId = ST.nextCreateJointId s
-                parentJointId = head $ ST.selectedJointIds s
-                (translateX, translateY) = (ST.translateX s, ST.translateY s)
-                (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
-                animation' = fmap (B.createJoint parentJointId newJointId localX localY) animation
-            in Right s
-                { ST.animation = animation'
-                , ST.nextCreateJointId = newJointId + 1
-                }
+        body = ST.visibleBody s
+        newJointId = ST.nextCreateJointId s
+        parentJointId = head $ ST.selectedJointIds s
+        (translateX, translateY) = (ST.translateX s, ST.translateY s)
+        (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
+        animation' = fmap (B.createJoint parentJointId newJointId localX localY) animation
+    in Right s
+        { ST.animation = animation'
+        , ST.nextCreateJointId = newJointId + 1
+        }
 
-        TrySelect x y selectMode ->
-            let translateX = ST.translateX s
-                translateY = ST.translateY s
-                bodyOnScreen = bodyToScreenCoordinates body (ST.viewScale s) translateX translateY
-            in case trySelectAt bodyOnScreen x y of
-                Just jointId ->
-                    let selectedJointIds = case selectMode of
-                                            Set -> [jointId]
-                                            Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
-                    in Right s { ST.selectedJointIds = selectedJointIds }
-                Nothing      -> Right s
+trySelect :: ST.AppState -> Int -> Int -> SelectMode -> EventResult
+trySelect s x y selectMode =
+    let body = A.currentFrameData $ ST.animation s
+        translateX = ST.translateX s
+        translateY = ST.translateY s
+        bodyOnScreen = bodyToScreenCoordinates body (ST.viewScale s) translateX translateY
+    in case trySelectAt bodyOnScreen x y of
+        Nothing      -> Right s
+        Just jointId ->
+            let selectedJointIds = case selectMode of
+                                    Set -> [jointId]
+                                    Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
+            in Right s { ST.selectedJointIds = selectedJointIds }
 
-        RotateSelected deg ->
-            let nonRootJointIds = filter (/= B.rootJointId) (ST.selectedJointIds s)
-                rotatees = T.val <$> mapMaybe
-                    (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
-                    nonRootJointIds
-                rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
-                body' = foldl' (&) body rotateActions
+rotateSelected :: ST.AppState -> Double -> EventResult
+rotateSelected s deg =
+    let animation = ST.animation s
+        body = A.currentFrameData animation
+        nonRootJointIds = filter (/= B.rootJointId) (ST.selectedJointIds s)
+        rotatees = T.val <$> mapMaybe
+            (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
+            nonRootJointIds
+        rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
+        body' = foldl' (&) body rotateActions
+    in Right s { ST.animation = A.setCurrentFrameData animation body' }
+
+moveSelected :: ST.AppState -> Double -> Double -> EventResult
+moveSelected s x y =
+    let animation = ST.animation s
+        body = A.currentFrameData animation
+        translateX = ST.translateX s
+        translateY = ST.translateY s
+        (localX, localY) = Sel.screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
+
+        jointId = head $ ST.selectedJointIds s
+        joint = T.val <$> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
+    in case joint of
+        Nothing -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
+        Just j  ->
+            let body' = B.moveJoint localX localY j body
             in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
-        MoveSelected x y ->
-            let translateX = ST.translateX s
-                translateY = ST.translateY s
-                (localX, localY) = Sel.screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
+createFrame :: ST.AppState -> EventResult
+createFrame s =
+    let body = ST.visibleBody s
+        animation = ST.animation s
+    in Right s { ST.animation = A.appendFrame animation body }
 
-                jointId = head $ ST.selectedJointIds s
-                joint = T.val <$> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
-            in case joint of
-                Nothing     -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
-                Just j  ->
-                    let body' = B.moveJoint localX localY j body
-                    in Right s { ST.animation = A.setCurrentFrameData animation body' }
+deleteFrame :: ST.AppState -> EventResult
+deleteFrame s = Right s { ST.animation = A.deleteCurrentFrame (ST.animation s)}
 
-        ExtendSelectionRect x y -> Right s
+frameStep :: ST.AppState -> Int -> EventResult
+frameStep s n = Right s { ST.animation = A.frameStep (ST.animation s) n }
 
-        DragRotateSelected x y -> Right s
-
-        CreateFrame -> Right s { ST.animation = A.appendFrame animation body }
-
-        DeleteFrame -> Right s { ST.animation = A.deleteCurrentFrame animation }
-
-        FrameStep n -> Right s { ST.animation = A.frameStep animation n }
