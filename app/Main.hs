@@ -21,6 +21,7 @@ import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
                                             clickPos, getScrollDirection,
                                             motionModifiers, motionPos)
 import qualified Luukasa.EventHandler      as EV
+import qualified Luukasa.Joint
 import qualified Luukasa.Render            as Render (render)
 
 newtype EventM a = EventM { runEventM :: ReaderT (IORef AppState) IO a }
@@ -59,17 +60,30 @@ buildUi stateRef = do
 
     window <- GO.builderGetObject builder "mainWindow" >>= Gtk.unsafeCastTo Gtk.Window . fromJust
     Gtk.onWidgetDestroy window Gtk.mainQuit
-
     canvas <- GO.builderGetObject builder "mainCanvas" >>= Gtk.unsafeCastTo Gtk.DrawingArea . fromJust
+
+    -- Menu items
     fileOpen <- GO.builderGetObject builder "fileOpen" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
     fileSave <- GO.builderGetObject builder "fileSave" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
     fileQuit <- GO.builderGetObject builder "fileQuit" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
 
+    -- Button bar buttons
+    btnPlayback <- GO.builderGetObject builder "btnPlayback" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
+    Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
+
+    -- Joint lock mode radio buttons
+    radioLockModeNoLock <- GO.builderGetObject builder "radioLockModeNoLock" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    radioLockModeDrag <- GO.builderGetObject builder "radioLockModeDrag" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    radioLockModeRotate <- GO.builderGetObject builder "radioLockModeRotate" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+
+    Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Luukasa.Joint.NoLock
+    Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Drag
+    Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Rotate
+
+    -- Bottom grid items
     statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
     Gtk.labelSetLabel statusBar "Luukasa started"
 
-    btnPlayback <- GO.builderGetObject builder "btnPlayback" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
-    Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
 
     -- Event handlers
     _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
@@ -147,8 +161,6 @@ buildUi stateRef = do
         return ()
 
     Gtk.widgetShowAll window
-
-    return ()
 
 
 playbackHandler :: IORef AppState -> Gtk.DrawingArea -> Gtk.Button -> IO ()

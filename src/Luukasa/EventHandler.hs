@@ -20,12 +20,18 @@ import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
                                          clickPos, getScrollDirection,
                                          motionModifiers, motionPos)
+import           Luukasa.Joint          (JointLockMode (..))
 
 updateAppState :: HasAppState m => Either a AppState -> m ()
 updateAppState result = do
     case result of
         Left _         -> return ()
         Right newState -> put newState
+
+selectLockMode :: HasAppState m => JointLockMode -> m ()
+selectLockMode lockMode = do
+    appState <- get
+    put appState { jointLockMode = lockMode }
 
 
 canvasPrimaryMouseButtonClick :: (HasAppState m, HasMouseEvent m) => Gdk.EventButton -> m (Either ErrorMessage AppState)
