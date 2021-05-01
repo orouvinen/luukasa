@@ -147,14 +147,6 @@ buildUi stateRef = do
         return ()
 
     Gtk.widgetShowAll window
-    {-
-        Set up initial view translation so that coordinate (0, 0)
-        is rendered at center of the drawing area.
-    -}
-    -- width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
-    -- height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
-    -- _ <- runEventHandler $ EV.setViewTranslate (width' / 2) (height' / 2)
-
 
     return ()
 
