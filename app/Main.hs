@@ -36,8 +36,6 @@ instance HasKeyEvent EventM where
 
 instance HasMouseEvent EventM where
     getScrollDirection = Gdk.getEventScrollDirection
-    -- eventPos e = (,) <$> (e `Gdk.get` #x) <*> (e `Gdk.get` #y)
-    -- clickPos e = (,) <$> (e `Gdk.get` #x) <*> (e `Gdk.get` #y)
     clickPos e = (,) <$> Gdk.getEventButtonX e <*> Gdk.getEventButtonY e
     motionPos e = (,) <$> Gdk.getEventMotionX e <*> Gdk.getEventMotionY e
     clickModifiers = Gdk.getEventButtonState

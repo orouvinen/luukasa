@@ -54,7 +54,7 @@ initialState = AppState
     , viewScale = 1
     , translateX = 0
     , translateY = 0
-    , jointLockMode = Rotate
+    , jointLockMode = NoLock
     , dragMode = DragMove
     , frameStart = Nothing
     }
