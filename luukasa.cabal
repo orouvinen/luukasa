@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 059e2554f5babb37ea24543cd02207bc23d7c1fa0decf038dfc60c7b16bfcfb9
+-- hash: 77ae600bbb0e7eb057a134283681674d8e8d611c828fbbef985665451b7baea3
 
 name:           luukasa
 version:        0.1.0.0
@@ -35,7 +35,6 @@ library
       Luukasa.EditorAction
       Luukasa.Event.Keyboard
       Luukasa.Event.Mouse
-      Luukasa.Event.Playback
       Luukasa.EventHandler
       Luukasa.Joint
       Luukasa.JointSelect

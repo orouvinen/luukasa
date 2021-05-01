@@ -1,5 +1,4 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedLabels           #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
 import           Data.IORef                (IORef, newIORef, readIORef,
@@ -23,10 +22,6 @@ import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
                                             motionModifiers, motionPos)
 import qualified Luukasa.EventHandler      as EV
 import qualified Luukasa.Render            as Render (render)
-
-windowWidth, windowHeight :: Int
-windowWidth = 800
-windowHeight = 600
 
 newtype EventM a = EventM { runEventM :: ReaderT (IORef AppState) IO a }
     deriving (Functor, Applicative, Monad, MonadReader (IORef AppState), MonadIO)
@@ -66,28 +61,23 @@ buildUi stateRef = do
     Gtk.onWidgetDestroy window Gtk.mainQuit
 
     canvas <- GO.builderGetObject builder "mainCanvas" >>= Gtk.unsafeCastTo Gtk.DrawingArea . fromJust
-    -- grid <- GO.builderGetObject builder "grid" >>= Gtk.unsafeCastTo Gtk.Grid . fromJust
-    -- MenuBar & menu(s) & menu items
-    -- menubar <- GO.builderGetObject builder "menuBar" >>= Gtk.unsafeCastTo Gtk.MenuBar . fromJust
-    -- file <- GO.builderGetObject builder "file" >>= Gtk.unsafeCastTo Gtk.MenuItem . fromJust
     fileOpen <- GO.builderGetObject builder "fileOpen" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
     fileSave <- GO.builderGetObject builder "fileSave" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
     fileQuit <- GO.builderGetObject builder "fileQuit" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
-    -- TODO: load file menu separator item?
 
-    -- Button bar
-    -- buttonBox <- GO.builderGetObject builder "buttonBox" >>= Gtk.unsafeCastTo Gtk.ButtonBox . fromJust
+    statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
+    Gtk.labelSetLabel statusBar "Luukasa started"
+
     btnPlayback <- GO.builderGetObject builder "btnPlayback" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
     Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
 
     -- Event handlers
     _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
-    Gtk.widgetSetSizeRequest canvas (fromIntegral windowWidth) (fromIntegral windowHeight)
 
     -- Event handling for drawing area
     _ <- Gtk.onWidgetScrollEvent canvas $ \ev -> do
         runEventHandler $ EV.canvasScrollWheel ev
-        Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
+        Gtk.widgetQueueDraw canvas
         return True
 
     Gtk.widgetAddEvents canvas
@@ -99,8 +89,7 @@ buildUi stateRef = do
         ]
 
     _ <- Gtk.onWidgetButtonPressEvent canvas $ \ev -> do
-        button <- fromIntegral <$> ev `Gdk.get` #button
-
+        button <- fromIntegral <$> Gdk.getEventButtonButton ev
         case button of
             Gdk.BUTTON_PRIMARY -> do
                                     res <- runEventHandler $ EV.canvasPrimaryMouseButtonClick ev
@@ -108,11 +97,11 @@ buildUi stateRef = do
                                     return ()
             _                  -> return ()
 
-        Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
+        Gtk.widgetQueueDraw canvas
         return True
 
     _ <- Gtk.onWidgetButtonReleaseEvent canvas $ \ev -> do
-        button <- fromIntegral <$> ev `Gdk.get` #button
+        button <- fromIntegral <$> Gdk.getEventButtonButton ev
 
         case button of
             Gdk.BUTTON_PRIMARY -> runEventHandler $ EV.canvasPrimaryMouseButtonRelease ev
@@ -136,7 +125,6 @@ buildUi stateRef = do
 
         when (key == Gdk.KEY_space) $ playbackHandler stateRef canvas btnPlayback
 
-        --Gtk.widgetQueueDrawArea canvas 0 0 (fromIntegral windowWidth) (fromIntegral windowHeight)
         Gtk.widgetQueueDraw canvas
         return True
 
@@ -151,7 +139,6 @@ buildUi stateRef = do
     _ <- Gtk.onMenuItemActivate fileSave $ runEvent stateRef (EV.menuSave window)
     _ <- Gtk.onMenuItemActivate fileOpen $ runEvent stateRef (EV.menuOpen window)
 
-    Gtk.windowSetPosition window Gtk.WindowPositionCenter
     Gtk.widgetShowAll window
     {-
         Set up initial view translation so that coordinate (0, 0)
@@ -160,6 +147,13 @@ buildUi stateRef = do
     width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
     height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
     _ <- runEventHandler $ EV.setViewTranslate (width' / 2) (height' / 2)
+
+    Gtk.onWidgetSizeAllocate canvas $ \rect -> do
+        newWidth <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
+        newHeight <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
+        _ <- runEventHandler $ EV.setViewTranslate (newWidth / 2) (newHeight / 2)
+        return ()
+
 
     return ()
 
