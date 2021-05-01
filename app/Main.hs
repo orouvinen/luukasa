@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedLabels           #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
-import           Data.GI.Base              (AttrOp ((:=)), new, on)
 import           Data.IORef                (IORef, newIORef, readIORef,
                                             writeIORef)
 import           GI.Cairo.Render.Connector (renderWithContext)
@@ -22,8 +21,8 @@ import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
                                             clickPos, getScrollDirection,
                                             motionModifiers, motionPos)
+import qualified Luukasa.EventHandler      as EV
 import qualified Luukasa.Render            as Render (render)
-import qualified Luukasa.UiEventHandler    as EV
 
 windowWidth, windowHeight :: Int
 windowWidth = 800

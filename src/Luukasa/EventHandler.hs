@@ -1,114 +1,223 @@
+{-# LANGUAGE OverloadedLabels  #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Luukasa.EventHandler (Event(..), SelectMode(..), dispatchAction, ErrorMessage) where
 
-import           Data.Foldable       (foldl')
-import           Data.Function       ((&))
-import           Data.Maybe          (mapMaybe)
-import qualified Data.Text           as T
+module Luukasa.EventHandler where
+
+import           Control.Monad          (when)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Aeson             (decode, encode)
+import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
+import           Data.GI.Base           (AttrOp ((:=)), new)
+import           Data.Maybe             (fromJust)
+import qualified GI.Gdk                 as Gdk
+import qualified GI.Gtk                 as Gtk
+import           Luukasa.Animation
+import           Luukasa.AppState       as ST
 import           Luukasa.Common
+import           Luukasa.EditorAction   as E (Action (..), SelectMode (..),
+                                              dispatchAction)
+import           Luukasa.Event.Keyboard
+import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
+                                         clickPos, getScrollDirection,
+                                         motionModifiers, motionPos)
 
-import qualified Luukasa.Animation   as A
-import qualified Luukasa.AppState    as ST
-import qualified Luukasa.Body        as B
-import qualified Luukasa.Joint       as J
-import           Luukasa.JointSelect as Sel
-import qualified Tree                as T
-
-data SelectMode = Set | Toggle
-data Event
-    -- Joint operations
-    = CreateJoint Int Int
-    | TrySelect Int Int SelectMode
-    | RotateSelected Double
-    | MoveSelected Double Double
-    | ExtendSelectionRect Double Double
-    | DragRotateSelected Double Double
-    -- Animation
-    | CreateFrame
-    | DeleteFrame
-    | FrameStep Int
+updateAppState :: HasAppState m => Either a AppState -> m ()
+updateAppState result = do
+    case result of
+        Left _         -> return ()
+        Right newState -> put newState
 
 
-type EventResult = Either ErrorMessage ST.AppState
+canvasPrimaryMouseButtonClick :: (HasAppState m, HasMouseEvent m) => Gdk.EventButton -> m (Either ErrorMessage AppState)
+canvasPrimaryMouseButtonClick e = do
+    appState <- get
 
-dispatchAction :: ST.AppState -> Event -> EventResult
-dispatchAction s e =
-    case e of
-        CreateJoint x y          -> createJoint s x y
-        TrySelect x y selectMode -> trySelect s x y selectMode
-        RotateSelected deg       -> rotateSelected s deg
-        MoveSelected x y         -> moveSelected s x y
-        ExtendSelectionRect x y  -> Right s
-        DragRotateSelected x y   -> Right s
-        CreateFrame              -> createFrame s
-        DeleteFrame              -> deleteFrame s
-        FrameStep n              -> frameStep s n
+    (x', y') <- clickPos e
+    let x = truncate x'
+        y = truncate y'
 
-createJoint :: ST.AppState -> Int -> Int -> EventResult
-createJoint s x y =
-    let animation = ST.animation s
-        body = ST.visibleBody s
-        newJointId = ST.nextCreateJointId s
-        parentJointId = head $ ST.selectedJointIds s
-        (translateX, translateY) = (ST.translateX s, ST.translateY s)
-        (localX, localY) = screenToLocalBody body (ST.viewScale s) translateX translateY x y
-        animation' = fmap (B.createJoint parentJointId newJointId localX localY) animation
-    in Right s
-        { ST.animation = animation'
-        , ST.nextCreateJointId = newJointId + 1
-        }
+    ctrlPressed <- elem Gdk.ModifierTypeControlMask <$> clickModifiers e
 
-trySelect :: ST.AppState -> Int -> Int -> SelectMode -> EventResult
-trySelect s x y selectMode =
-    let body = A.currentFrameData $ ST.animation s
-        translateX = ST.translateX s
-        translateY = ST.translateY s
-        bodyOnScreen = bodyToScreenCoordinates body (ST.viewScale s) translateX translateY
-    in case trySelectAt bodyOnScreen x y of
-        Nothing      -> Right s
-        Just jointId ->
-            let selectedJointIds = case selectMode of
-                                    Set -> [jointId]
-                                    Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
-            in Right s { ST.selectedJointIds = selectedJointIds }
+    let dispatch = dispatchAction appState
+        result = case actionState appState of
+            PlacingNewJoint -> dispatch $ E.CreateJoint x y
+            Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
+            _               -> Right appState
 
-rotateSelected :: ST.AppState -> Double -> EventResult
-rotateSelected s deg =
-    let animation = ST.animation s
-        body = A.currentFrameData animation
-        nonRootJointIds = filter (/= B.rootJointId) (ST.selectedJointIds s)
-        rotatees = T.val <$> mapMaybe
-            (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
-            nonRootJointIds
-        rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
-        body' = foldl' (&) body rotateActions
-    in Right s { ST.animation = A.setCurrentFrameData animation body' }
+    updateAppState result
+    return result
 
-moveSelected :: ST.AppState -> Double -> Double -> EventResult
-moveSelected s x y =
-    let animation = ST.animation s
-        body = A.currentFrameData animation
-        translateX = ST.translateX s
-        translateY = ST.translateY s
-        (localX, localY) = Sel.screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
 
-        jointId = head $ ST.selectedJointIds s
-        joint = T.val <$> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body)
-    in case joint of
-        Nothing -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
-        Just j  ->
-            let body' = B.moveJoint localX localY j body
-            in Right s { ST.animation = A.setCurrentFrameData animation body' }
+canvasPrimaryMouseButtonRelease :: HasAppState m => Gdk.EventButton -> m ()
+canvasPrimaryMouseButtonRelease _ = do
+    appState <- get
 
-createFrame :: ST.AppState -> EventResult
-createFrame s =
-    let body = ST.visibleBody s
-        animation = ST.animation s
-    in Right s { ST.animation = A.appendFrame animation body }
+    if isPlaybackOn appState
+        then return ()
+        else put appState { actionState = Idle }
 
-deleteFrame :: ST.AppState -> EventResult
-deleteFrame s = Right s { ST.animation = A.deleteCurrentFrame (ST.animation s)}
+startPlayback :: HasAppState m => TimerCallbackId -> TimestampUs -> m ()
+startPlayback timerCallbackId timestamp = do
+    appState <- get
+    put appState { actionState = AnimationPlayback timerCallbackId
+                 , frameStart = Just timestamp
+                 }
 
-frameStep :: ST.AppState -> Int -> EventResult
-frameStep s n = Right s { ST.animation = A.frameStep (ST.animation s) n }
+stopPlayback :: HasAppState m => m ()
+stopPlayback = do
+    appState <- get
+    put appState { actionState = Idle
+                 , frameStart = Nothing
+                 }
+
+playbackTick :: HasAppState m => TimestampUs -> m Bool
+playbackTick timestamp = do
+    s <- get
+    let frameIntervalUs = (1.0 / (fromIntegral (fps $ animation s) :: Double)) * 1000 * 1000
+        lastFrame = fromJust (ST.frameStart s)
+        sinceLastFrame = timestamp - lastFrame
+        renderNeeded = fromIntegral sinceLastFrame >= frameIntervalUs
+
+    when renderNeeded $ do
+        -- timestamp might not be totally accurate for frameStart if
+        -- this frame is delayed. Should probably set the originally intended frameStart?
+        let result = dispatchAction s { frameStart = Just timestamp } (E.FrameStep 1)
+        updateAppState result
+
+    return renderNeeded
+
+canvasKeyPress :: (HasAppState m, HasKeyEvent m) => Gdk.EventKey -> m ()
+canvasKeyPress eventKey = do
+    appState <- get
+    key <- getKey eventKey
+
+    -- print $ actionState appState
+
+    let dispatch = dispatchAction appState
+    --     debugJoints = printJoints appState
+    --     debugState = printState appState
+
+    -- liftIO $ putStr $ case key of
+    --     Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
+    --     Gdk.KEY_2 -> "STATE: " ++ debugState
+    --     _         -> ""
+
+    let result = case key of
+            Gdk.KEY_J       ->
+                if selectionSize appState == 1 -- Parent joint needs to be selected
+                    then Right appState { actionState = PlacingNewJoint }
+                    else Left "No joint selected" -- TODO: this is not the kind of error we're looking for
+
+            Gdk.KEY_Up          -> dispatch $ E.RotateSelected 2
+            Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-2)
+            Gdk.KEY_KP_Add      -> dispatch E.CreateFrame
+            Gdk.KEY_KP_Subtract -> dispatch E.DeleteFrame
+            Gdk.KEY_Left        -> dispatch $ E.FrameStep (-1)
+            Gdk.KEY_Right       -> dispatch $ E.FrameStep 1
+            _                   -> Right appState
+
+    updateAppState result
+
+scrollWheelScaleStep :: Double
+scrollWheelScaleStep = 0.1
+
+canvasScrollWheel :: (HasAppState m, HasMouseEvent m) => Gdk.EventScroll -> m ()
+canvasScrollWheel eventScroll = do
+    appState <- get
+    scrollDirection <- getScrollDirection eventScroll
+
+    let scaleChange =
+            if scrollDirection == Gdk.ScrollDirectionDown
+            then -scrollWheelScaleStep
+            else scrollWheelScaleStep
+
+    let newState = appState { viewScale = viewScale appState + scaleChange }
+    put newState
+
+canvasMouseMotion :: (HasAppState m, HasMouseEvent m) => Gdk.EventMotion -> m (Either ErrorMessage AppState)
+canvasMouseMotion e = do
+    appState <- get
+
+    mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
+
+    if not mouseBtnPressed || selectionSize appState /= 1
+        then return $ Right appState
+        else do
+            (mouseX, mouseY) <- motionPos e
+
+            let dragState =
+                    if selectionSize appState == 0
+                        then DragSelectionRect
+                        else DragSelected (dragMode appState)
+
+                action = case dragState of
+                    DragSelectionRect -> E.ExtendSelectionRect mouseX mouseY
+                    DragSelected DragMove -> E.MoveSelected mouseX mouseY
+                    -- Just a placeholder for now
+                    DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
+
+            let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
+            updateAppState result
+            return result
+
+setViewScale :: HasAppState m => Double -> m ()
+setViewScale scaleFactor = do
+    state <- get
+    put state { viewScale = scaleFactor }
+
+setViewTranslate :: HasAppState m => Double -> Double -> m ()
+setViewTranslate trX trY = do
+    state <- get
+    put state { translateX = trX, translateY = trY }
+
+menuSave :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
+menuSave w = do
+    state <- get
+    filename <- saveFileChooserDialog w
+
+    case filename of
+        Nothing -> return ()
+        Just f  -> do
+            let json = encode $ ST.animation state
+            liftIO $ BS.writeFile f json
+
+
+menuOpen :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
+menuOpen w = do
+    state <- get
+    filename <- openFileChooserDialog w
+
+    case filename of
+        Nothing -> return ()
+        Just f -> do
+            json <- liftIO $ BS.readFile f
+            let animation' = decode json
+
+            case animation' of
+                Nothing -> return ()
+                Just a  -> put state { ST.animation = a }
+
+
+saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe String)
+saveFileChooserDialog = fileChooserDialog Gtk.FileChooserActionSave
+
+openFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe String)
+openFileChooserDialog = fileChooserDialog Gtk.FileChooserActionOpen
+
+fileChooserDialog :: MonadIO m => Gtk.FileChooserAction -> Gtk.Window -> m (Maybe String)
+fileChooserDialog actionType mainWindow = do
+    dlg <- new Gtk.FileChooserDialog [ #title := "Save animation"
+                                     , #action := actionType
+                                     ]
+
+    Gtk.windowSetTransientFor dlg $ Just mainWindow
+    _ <- Gtk.dialogAddButton dlg "gtk-save" $ (toEnum . fromEnum) Gtk.ResponseTypeAccept
+    _ <- Gtk.dialogAddButton dlg "gtk-cancel" $ (toEnum . fromEnum) Gtk.ResponseTypeCancel
+
+    Gtk.widgetShow dlg
+    _ <- Gtk.dialogRun dlg
+
+    filename <- Gtk.fileChooserGetFilename dlg
+    Gtk.widgetDestroy dlg
+    return filename
 
