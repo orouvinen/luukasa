@@ -139,20 +139,21 @@ buildUi stateRef = do
     _ <- Gtk.onMenuItemActivate fileSave $ runEvent stateRef (EV.menuSave window)
     _ <- Gtk.onMenuItemActivate fileOpen $ runEvent stateRef (EV.menuOpen window)
 
+    -- View local coordinate [0,0] at center of the canvas
+    Gtk.onWidgetSizeAllocate canvas $ \_ -> do
+        newWidth <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
+        newHeight <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
+        _ <- runEventHandler $ EV.setViewTranslate (newWidth / 2) (newHeight / 2)
+        return ()
+
     Gtk.widgetShowAll window
     {-
         Set up initial view translation so that coordinate (0, 0)
         is rendered at center of the drawing area.
     -}
-    width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
-    height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
-    _ <- runEventHandler $ EV.setViewTranslate (width' / 2) (height' / 2)
-
-    Gtk.onWidgetSizeAllocate canvas $ \rect -> do
-        newWidth <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
-        newHeight <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
-        _ <- runEventHandler $ EV.setViewTranslate (newWidth / 2) (newHeight / 2)
-        return ()
+    -- width' <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
+    -- height' <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
+    -- _ <- runEventHandler $ EV.setViewTranslate (width' / 2) (height' / 2)
 
 
     return ()
