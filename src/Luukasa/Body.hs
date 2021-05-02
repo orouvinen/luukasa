@@ -1,6 +1,18 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Luukasa.Body (Body(..), create, jointPositions, limbSegments, getParentUnsafe, rootJointId, rotateJoint, addJoint, moveJoint, createJoint) where
+module Luukasa.Body
+    ( Body(..)
+    , create
+    , jointPositions
+    , limbSegments
+    , getParentUnsafe
+    , rootJointId
+    , rotateJoint
+    , rotateJointTowards
+    , addJoint
+    , setJointPosition
+    , createJoint)
+    where
 
 import           Data.Function ((&))
 import           Data.List     (foldl')
@@ -16,8 +28,10 @@ import qualified Tree          as T (children, create, findNode, findNodeBy,
                                      replaceVal, replaceValBy, setChildValues,
                                      setChildren, setVal, val)
 
+import           Calc          (angle)
 import           Data.Aeson    (FromJSON, ToJSON)
 import           GHC.Generics  (Generic)
+import qualified Units
 
 rootJointId :: JointId
 rootJointId = 0
@@ -49,6 +63,13 @@ create =
         , parentLookup = Map.empty
         }
 
+rotateJointTowards :: JointLockMode -> Double -> Double -> Joint -> Body -> Body
+rotateJointTowards lockMode x y joint body =
+    let parent = getParentUnsafe body (J.jointId joint)
+        a1 = angle (J.jointX parent) (J.jointY parent) (J.jointX joint) (J.jointY joint)
+        a2 = angle (J.jointX parent) (J.jointY parent) x y
+        delta = Units.getDegrees $ a2 - a1
+    in rotateJoint lockMode delta joint body
 
 rotateJoint :: JointLockMode -> Double -> Joint -> Body -> Body
 rotateJoint lockMode deg joint body =
@@ -96,8 +117,8 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
             in  T.setChildren node children
 
 
-moveJoint :: Double -> Double -> Joint -> Body -> Body
-moveJoint x y joint body =
+setJointPosition :: Double -> Double -> Joint -> Body -> Body
+setJointPosition x y joint body =
     let parent = getParentUnsafe body (J.jointId joint)
         jointNode = fromJust $ T.findNode joint (root body)
         children = T.children jointNode

@@ -1,14 +1,17 @@
 module Luukasa.AppState where
 
 import           Data.Foldable     (toList)
-import qualified Data.Text         as T
+import           Data.Text         (Text)
 
+import           Data.Maybe        (mapMaybe)
 import           Luukasa.Animation (Animation)
 import qualified Luukasa.Animation as A
 import           Luukasa.Body      (Body)
 import qualified Luukasa.Body      as B
 import           Luukasa.Common
-import           Luukasa.Joint     (JointId, JointLockMode (..))
+import           Luukasa.Joint     (Joint, JointId, JointLockMode (..))
+import qualified Luukasa.Joint     as J
+import qualified Tree              as T
 
 data DragState = DragSelected DragMode | DragSelectionRect deriving Show
 data ActionState
@@ -34,7 +37,7 @@ data AppState = AppState
     { actionState       :: ActionState
     , animation         :: Animation Body
     , nextCreateJointId :: Int
-    , fileName          :: Maybe T.Text
+    , fileName          :: Maybe Text
     , viewScale         :: Double
     , translateX        :: Double
     , translateY        :: Double
@@ -55,7 +58,7 @@ initialState = AppState
     , translateX = 0
     , translateY = 0
     , jointLockMode = NoLock
-    , dragMode = DragMove
+    , dragMode = DragRotate
     , frameStart = Nothing
     }
 
@@ -73,6 +76,16 @@ visibleBody = A.currentFrameData . animation
 setVisibleBody :: AppState -> Body -> AppState
 setVisibleBody s b =
     s { animation = A.setCurrentFrameData (animation s) b }
+
+selectedNonRootJoints :: AppState -> [Joint]
+selectedNonRootJoints s =
+    let body = A.currentFrameData $ animation s
+    in T.val <$> mapMaybe
+        (\jointId ->
+            if jointId == B.rootJointId
+                then Nothing
+                else T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
+        (selectedJointIds s)
 
 printJoints :: AppState -> String
 printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root body
