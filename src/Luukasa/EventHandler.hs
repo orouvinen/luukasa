@@ -145,6 +145,7 @@ canvasMouseMotion e = do
     appState <- get
 
     mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
+    ctrlPressed <- elem Gdk.ModifierTypeControlMask <$> motionModifiers e
 
     if not mouseBtnPressed || selectionSize appState /= 1
         then return $ Right appState
@@ -154,7 +155,13 @@ canvasMouseMotion e = do
             let dragState =
                     if selectionSize appState == 0
                         then DragSelectionRect
-                        else DragSelected (dragMode appState)
+                        else DragSelected $ if ctrlPressed then toggledDragMode else defaultDragMode
+                          where
+                            defaultDragMode = dragMode appState
+                            toggledDragMode = case defaultDragMode of
+                                                    DragMove   -> DragRotate
+                                                    DragRotate -> DragMove
+
 
                 action = case dragState of
                     DragSelectionRect -> E.ExtendSelectionRect mouseX mouseY

@@ -3,7 +3,6 @@ module Luukasa.EditorAction (Action(..), SelectMode(..), dispatchAction, ErrorMe
 
 import           Data.Foldable       (foldl')
 import           Data.Function       ((&))
-import           Data.Maybe          (mapMaybe)
 import qualified Data.Text           as T
 import           Luukasa.Common
 
@@ -39,7 +38,7 @@ dispatchAction s e =
         RotateSelected deg       -> rotateSelected s deg
         MoveSelected x y         -> moveSelected s x y
         ExtendSelectionRect x y  -> Right s
-        DragRotateSelected x y   -> Right s
+        DragRotateSelected x y   -> rotateSelectedTowards s x y
         CreateFrame              -> createFrame s
         DeleteFrame              -> deleteFrame s
         FrameStep n              -> frameStep s n
@@ -76,13 +75,23 @@ rotateSelected :: ST.AppState -> Double -> ActionResult
 rotateSelected s deg =
     let animation = ST.animation s
         body = A.currentFrameData animation
-        nonRootJointIds = filter (/= B.rootJointId) (ST.selectedJointIds s)
-        rotatees = T.val <$> mapMaybe
-            (\jointId -> T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
-            nonRootJointIds
+        rotatees = ST.selectedNonRootJoints s
         rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
         body' = foldl' (&) body rotateActions
     in Right s { ST.animation = A.setCurrentFrameData animation body' }
+
+rotateSelectedTowards :: ST.AppState -> Double -> Double -> ActionResult
+rotateSelectedTowards s x y =
+    let animation = ST.animation s
+        body = A.currentFrameData animation
+        (translateX, translateY) = (ST.translateX s, ST.translateY s)
+        (localX, localY) = screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
+
+        rotatees = ST.selectedNonRootJoints s
+        rotateActions = [B.rotateJointTowards (ST.jointLockMode s) localX localY j | j <- rotatees]
+        body' = foldl' (&) body rotateActions
+    in Right s { ST.animation = A.setCurrentFrameData animation body' }
+
 
 moveSelected :: ST.AppState -> Double -> Double -> ActionResult
 moveSelected s x y =
@@ -97,7 +106,7 @@ moveSelected s x y =
     in case joint of
         Nothing -> Left $ "jointId " <> T.pack (show jointId) <> " not found. This should not happen."
         Just j  ->
-            let body' = B.moveJoint localX localY j body
+            let body' = B.setJointPosition localX localY j body
             in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
 createFrame :: ST.AppState -> ActionResult
