@@ -61,18 +61,15 @@ runEventWithResult stateRef onError eventHandler = do
     case result of
         Left err -> onError err
         Right _  -> return ()
+
     return result
 
 buildUi :: IORef AppState -> IO ()
 buildUi stateRef = do
-    let runEventHandler = runEvent stateRef
-        runEventResult = runEventWithResult stateRef
-
     builder <- GO.builderNew
-    GO.builderAddFromFile builder "ui/main.glade"
+    _ <- GO.builderAddFromFile builder "ui/main.glade"
 
     window <- GO.builderGetObject builder "mainWindow" >>= Gtk.unsafeCastTo Gtk.Window . fromJust
-    Gtk.onWidgetDestroy window Gtk.mainQuit
     canvas <- GO.builderGetObject builder "mainCanvas" >>= Gtk.unsafeCastTo Gtk.DrawingArea . fromJust
 
     -- Menu items
@@ -82,23 +79,29 @@ buildUi stateRef = do
 
     -- Button bar buttons
     btnPlayback <- GO.builderGetObject builder "btnPlayback" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
-    Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
 
     -- Joint lock mode radio buttons
     radioLockModeNoLock <- GO.builderGetObject builder "radioLockModeNoLock" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
     radioLockModeDrag <- GO.builderGetObject builder "radioLockModeDrag" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
     radioLockModeRotate <- GO.builderGetObject builder "radioLockModeRotate" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
 
-    Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Luukasa.Joint.NoLock
-    Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Drag
-    Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Rotate
-
     -- Bottom grid items
     statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
     Gtk.labelSetLabel statusBar "Luukasa started"
 
+    -- Event runners
+    let runEventHandler = runEvent stateRef
+        runEventHandlerWithResult = \onError handler -> Gtk.labelSetLabel statusBar "" >> runEventWithResult stateRef onError handler
 
     -- Event handlers
+    _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
+
+    _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Luukasa.Joint.NoLock
+    _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Drag
+    _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Rotate
+
+    _ <- Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
+
     _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
 
     -- Event handling for drawing area
@@ -106,14 +109,6 @@ buildUi stateRef = do
         runEventHandler $ EV.canvasScrollWheel ev
         Gtk.widgetQueueDraw canvas
         return True
-
-    Gtk.widgetAddEvents canvas
-        [ Gdk.EventMaskButtonPressMask
-        , Gdk.EventMaskButtonReleaseMask
-        , Gdk.EventMaskPointerMotionMask
-        , Gdk.EventMaskPointerMotionHintMask
-        , Gdk.EventMaskScrollMask
-        ]
 
     _ <- Gtk.onWidgetButtonPressEvent canvas $ \ev -> do
         button <- fromIntegral <$> Gdk.getEventButtonButton ev
@@ -144,9 +139,7 @@ buildUi stateRef = do
     source: https://gtk-d.dpldocs.info/gtk.DrawingArea.DrawingArea.html
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
-        runEventResult
-            (Gtk.labelSetLabel statusBar)
-            (EV.canvasKeyPress ev)
+        _ <- runEventHandlerWithResult (Gtk.labelSetLabel statusBar) (EV.canvasKeyPress ev)
 
         -- For now, handle playback event here directly
         key <- Gdk.getEventKeyKeyval ev
@@ -162,11 +155,11 @@ buildUi stateRef = do
 
     -- Menu item actions
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    _ <- Gtk.onMenuItemActivate fileSave $ runEvent stateRef (EV.menuSave window)
-    _ <- Gtk.onMenuItemActivate fileOpen $ runEvent stateRef (EV.menuOpen window)
+    _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >> Gtk.labelSetLabel statusBar "File saved."
+    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >> Gtk.labelSetLabel statusBar "File loaded."
 
     -- View local coordinate [0,0] at center of the canvas
-    Gtk.onWidgetSizeAllocate canvas $ \_ -> do
+    _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do
         newWidth <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
         newHeight <- fromIntegral <$> Gtk.widgetGetAllocatedHeight canvas
         _ <- runEventHandler $ EV.setViewTranslate (newWidth / 2) (newHeight / 2)
