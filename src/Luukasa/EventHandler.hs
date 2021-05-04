@@ -3,7 +3,7 @@
 
 module Luukasa.EventHandler where
 
-import           Control.Monad          (when)
+import           Control.Monad          (unless, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
@@ -22,19 +22,29 @@ import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
                                          motionModifiers, motionPos)
 import           Luukasa.Joint          (JointLockMode (..))
 
+type EventResult a = Either ErrorMessage a
+
+
+
+toEventResult :: Monad m => Either ErrorMessage AppState -> a -> m (EventResult a)
+toEventResult editorActionResult retval =
+    return $ case editorActionResult of
+        Right _  -> Right retval
+        Left err -> Left err
+
 updateAppState :: HasAppState m => Either a AppState -> m ()
 updateAppState result = do
     case result of
         Left _         -> return ()
         Right newState -> put newState
 
+
 selectLockMode :: HasAppState m => JointLockMode -> m ()
 selectLockMode lockMode = do
     appState <- get
     put appState { jointLockMode = lockMode }
 
-
-canvasPrimaryMouseButtonClick :: (HasAppState m, HasMouseEvent m) => Gdk.EventButton -> m (Either ErrorMessage AppState)
+canvasPrimaryMouseButtonClick :: (HasAppState m, HasMouseEvent m) => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonClick e = do
     appState <- get
 
@@ -51,16 +61,12 @@ canvasPrimaryMouseButtonClick e = do
             _               -> Right appState
 
     updateAppState result
-    return result
 
 
 canvasPrimaryMouseButtonRelease :: HasAppState m => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonRelease _ = do
     appState <- get
-
-    if isPlaybackOn appState
-        then return ()
-        else put appState { actionState = Idle }
+    unless (isPlaybackOn appState) $ put appState { actionState = Idle }
 
 startPlayback :: HasAppState m => TimerCallbackId -> TimestampUs -> m ()
 startPlayback timerCallbackId timestamp = do
@@ -92,7 +98,7 @@ playbackTick timestamp = do
 
     return renderNeeded
 
-canvasKeyPress :: (HasAppState m, HasKeyEvent m) => Gdk.EventKey -> m ()
+canvasKeyPress :: (HasAppState m, HasKeyEvent m) => Gdk.EventKey -> m (EventResult ())
 canvasKeyPress eventKey = do
     appState <- get
     key <- getKey eventKey
@@ -112,7 +118,7 @@ canvasKeyPress eventKey = do
             Gdk.KEY_J       ->
                 if selectionSize appState == 1 -- Parent joint needs to be selected
                     then Right appState { actionState = PlacingNewJoint }
-                    else Left "No joint selected" -- TODO: this is not the kind of error we're looking for
+                    else Left "Parent joint needs to be selected in order to create a joint"
 
             Gdk.KEY_Up          -> dispatch $ E.RotateSelected 2
             Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-2)
@@ -123,6 +129,7 @@ canvasKeyPress eventKey = do
             _                   -> Right appState
 
     updateAppState result
+    toEventResult result ()
 
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
@@ -140,38 +147,32 @@ canvasScrollWheel eventScroll = do
     let newState = appState { viewScale = viewScale appState + scaleChange }
     put newState
 
-canvasMouseMotion :: (HasAppState m, HasMouseEvent m) => Gdk.EventMotion -> m (Either ErrorMessage AppState)
+canvasMouseMotion :: (HasAppState m, HasMouseEvent m) => Gdk.EventMotion -> m ()
 canvasMouseMotion e = do
     appState <- get
 
     mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
     ctrlPressed <- elem Gdk.ModifierTypeControlMask <$> motionModifiers e
 
-    if not mouseBtnPressed || selectionSize appState /= 1
-        then return $ Right appState
-        else do
-            (mouseX, mouseY) <- motionPos e
+    when (mouseBtnPressed && selectionSize appState == 1) $ do
+        (mouseX, mouseY) <- motionPos e
+        let dragState =
+                if selectionSize appState == 0
+                    then DragSelectionRect
+                    else DragSelected $ if ctrlPressed then toggledDragMode else defaultDragMode
+                        where
+                        defaultDragMode = dragMode appState
+                        toggledDragMode = case defaultDragMode of
+                                                DragMove   -> DragRotate
+                                                DragRotate -> DragMove
 
-            let dragState =
-                    if selectionSize appState == 0
-                        then DragSelectionRect
-                        else DragSelected $ if ctrlPressed then toggledDragMode else defaultDragMode
-                          where
-                            defaultDragMode = dragMode appState
-                            toggledDragMode = case defaultDragMode of
-                                                    DragMove   -> DragRotate
-                                                    DragRotate -> DragMove
+            action = case dragState of
+                DragSelectionRect -> E.ExtendSelectionRect mouseX mouseY
+                DragSelected DragMove -> E.MoveSelected mouseX mouseY
+                DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
-
-                action = case dragState of
-                    DragSelectionRect -> E.ExtendSelectionRect mouseX mouseY
-                    DragSelected DragMove -> E.MoveSelected mouseX mouseY
-                    -- Just a placeholder for now
-                    DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
-
-            let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
-            updateAppState result
-            return result
+        let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
+        updateAppState result
 
 setViewScale :: HasAppState m => Double -> m ()
 setViewScale scaleFactor = do

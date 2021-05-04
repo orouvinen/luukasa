@@ -16,6 +16,7 @@ import           Data.Maybe                (fromJust)
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             HasAppState, actionState, get,
                                             initialState, put)
+import           Luukasa.Common            (ErrorMessage)
 import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
                                             clickPos, getScrollDirection,
@@ -50,9 +51,23 @@ main = do
 runEvent :: IORef AppState -> EventM a -> IO a
 runEvent stateRef handler = runReaderT (runEventM handler) stateRef
 
+runEventWithResult
+    :: IORef AppState
+    -> (ErrorMessage -> IO ())
+    -> EventM (Either ErrorMessage a)
+    -> IO (Either ErrorMessage a)
+runEventWithResult stateRef onError eventHandler = do
+    result <- runEvent stateRef eventHandler
+    case result of
+        Left err -> onError err
+        Right _  -> return ()
+    return result
+
 buildUi :: IORef AppState -> IO ()
 buildUi stateRef = do
     let runEventHandler = runEvent stateRef
+        runEventResult = runEventWithResult stateRef
+
     builder <- GO.builderNew
     GO.builderAddFromFile builder "ui/main.glade"
 
@@ -103,10 +118,7 @@ buildUi stateRef = do
     _ <- Gtk.onWidgetButtonPressEvent canvas $ \ev -> do
         button <- fromIntegral <$> Gdk.getEventButtonButton ev
         case button of
-            Gdk.BUTTON_PRIMARY -> do
-                                    res <- runEventHandler $ EV.canvasPrimaryMouseButtonClick ev
-                                    -- TODO handle result
-                                    return ()
+            Gdk.BUTTON_PRIMARY -> runEventHandler $ EV.canvasPrimaryMouseButtonClick ev
             _                  -> return ()
 
         Gtk.widgetQueueDraw canvas
@@ -132,17 +144,19 @@ buildUi stateRef = do
     source: https://gtk-d.dpldocs.info/gtk.DrawingArea.DrawingArea.html
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
-        runEventHandler $ EV.canvasKeyPress ev
-        key <- Gdk.getEventKeyKeyval ev
+        runEventResult
+            (Gtk.labelSetLabel statusBar)
+            (EV.canvasKeyPress ev)
 
+        -- For now, handle playback event here directly
+        key <- Gdk.getEventKeyKeyval ev
         when (key == Gdk.KEY_space) $ playbackHandler stateRef canvas btnPlayback
 
         Gtk.widgetQueueDraw canvas
         return True
 
     _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
-        res <- runEventHandler $ EV.canvasMouseMotion ev
-        -- TODO: handle result
+        runEventHandler $ EV.canvasMouseMotion ev
         Gtk.widgetQueueDraw canvas
         return True
 
