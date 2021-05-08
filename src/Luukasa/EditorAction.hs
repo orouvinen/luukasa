@@ -17,6 +17,7 @@ data SelectMode = Set | Toggle
 data Action
     -- Joint operations
     = CreateJoint Int Int
+    | DeleteSelected
     | TrySelect Int Int SelectMode
     | RotateSelected Double
     | MoveSelected Double Double
@@ -34,6 +35,7 @@ dispatchAction :: ST.AppState -> Action -> ActionResult
 dispatchAction s e =
     case e of
         CreateJoint x y          -> createJoint s x y
+        DeleteSelected           -> deleteSelectedJoints s
         TrySelect x y selectMode -> trySelect s x y selectMode
         RotateSelected deg       -> rotateSelected s deg
         MoveSelected x y         -> moveSelected s x y
@@ -56,6 +58,15 @@ createJoint s x y =
         { ST.animation = animation'
         , ST.nextCreateJointId = newJointId + 1
         }
+
+deleteSelectedJoints :: ST.AppState -> ActionResult
+deleteSelectedJoints s =
+    let animation = ST.animation s
+        body = A.currentFrameData animation
+        jointIds = J.jointId <$> ST.selectedNonRootJoints s
+        deleteActions = [B.deleteJoint j | j <- jointIds]
+        applyDelete = \b -> foldl' (&) b deleteActions
+    in Right s { ST.animation = applyDelete <$> animation }
 
 trySelect :: ST.AppState -> Int -> Int -> SelectMode -> ActionResult
 trySelect s x y selectMode =

@@ -119,7 +119,7 @@ canvasKeyPress eventKey = do
                 if selectionSize appState == 1 -- Parent joint needs to be selected
                     then Right appState { actionState = PlacingNewJoint }
                     else Left "Parent joint needs to be selected in order to create a joint"
-
+            Gdk.KEY_Delete      -> dispatch E.DeleteSelected
             Gdk.KEY_Up          -> dispatch $ E.RotateSelected 2
             Gdk.KEY_Down        -> dispatch $ E.RotateSelected (-2)
             Gdk.KEY_KP_Add      -> dispatch E.CreateFrame

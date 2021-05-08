@@ -3,6 +3,7 @@
 module Luukasa.Body
     ( Body(..)
     , create
+    , deleteJoint
     , isRoot
     , jointPositions
     , limbSegments
@@ -24,10 +25,10 @@ import           Data.Maybe    (fromJust)
 import           Luukasa.Joint (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint as J
 import           Tree          (Tree)
-import qualified Tree          as T (children, create, findNode, findNodeBy,
-                                     insert, replaceNode, replaceNodeBy,
-                                     replaceVal, replaceValBy, setChildValues,
-                                     setChildren, setVal, val)
+import qualified Tree          as T (children, create, delete, findNode,
+                                     findNodeBy, insert, replaceNode,
+                                     replaceNodeBy, replaceVal, replaceValBy,
+                                     setChildValues, setChildren, setVal, val)
 
 import           Calc          (angle)
 import           Data.Aeson    (FromJSON, ToJSON)
@@ -37,9 +38,11 @@ import qualified Units
 rootJointId :: JointId
 rootJointId = 0
 
+type ParentLookup = Map J.JointId J.JointId
+
 data Body = Body
     { root         :: Tree Joint
-    , parentLookup :: Map JointId JointId
+    , parentLookup :: ParentLookup
     , translateX   :: Int
     , translateY   :: Int
     } deriving (Generic, Show)
@@ -156,6 +159,11 @@ getParentUnsafe body jointId =
         parentJoint = fromJust $ T.findNodeBy (\j -> J.jointId j == parentId) (root body)
         in T.val parentJoint
 
+getJointByIdUnsafe :: Body -> JointId -> Joint
+getJointByIdUnsafe body jointId =
+    let node = fromJust $ T.findNodeBy (\j -> J.jointId j == jointId) (root body)
+    in T.val node
+
 jointPositions :: Body -> [(Double, Double)]
 jointPositions body =
     foldl' (\coords j -> (J.jointX j, J.jointY j) : coords) [] (root body)
@@ -193,3 +201,44 @@ createJoint parentJointId jointId x y body =
                     , J.jointR = 0
                     })
     in addJoint body parent newJoint
+
+{-
+    Joint deletion is slightly convoluted (and not any less so because of my
+    expressive abilites in the language, which I feel are lacking)
+    because the function needs to:
+        1. delete the given joint
+        2. update parent lookup table
+        3. update delete joint's children to maintain their
+           geometric relation to the parent, which has now changed.
+
+    In short - it isn't pretty.
+-}
+deleteJoint :: J.JointId -> Body -> Body
+deleteJoint jointId body =
+    let body' = body { root = T.delete (\x -> J.jointId (T.val x) == jointId) (root body) }
+    -- Ids of deleted joint's children
+        childIds = fst <$>
+            filter (\kvp -> snd kvp == jointId)
+            (Map.toList (parentLookup body))
+
+    -- New parent id for the said children
+        newParentId = parentLookup body ! jointId
+
+    -- Update parent lookup. The parent of the deleted joint inherits any children the deleted joint might have.
+        parentLookup' = parentLookupUpdateForInherit childIds newParentId (parentLookup body)
+
+        body'' = foldl' (\b childId -> updateChildGeometry b newParentId childId) body' childIds
+    in body''
+        { parentLookup = parentLookup'
+        }
+
+parentLookupUpdateForInherit :: [J.JointId] -> J.JointId -> ParentLookup -> ParentLookup
+parentLookupUpdateForInherit childIds newParentId parentLookup' =
+    foldl' (\m childId -> Map.adjust (const newParentId) childId m)
+    parentLookup' childIds
+
+updateChildGeometry :: Body -> J.JointId -> J.JointId -> Body
+updateChildGeometry body parentId childId =
+    let parent = getJointByIdUnsafe body parentId
+        child = getJointByIdUnsafe body childId
+    in body { root = T.replaceVal child (J.setChildAngleAndRadius parent child) (root body) }
