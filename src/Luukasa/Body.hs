@@ -3,6 +3,7 @@
 module Luukasa.Body
     ( Body(..)
     , create
+    , isRoot
     , jointPositions
     , limbSegments
     , getParentUnsafe

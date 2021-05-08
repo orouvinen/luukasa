@@ -16,25 +16,16 @@ import qualified GI.Cairo.Render        as CR hiding (x, y)
 
 data Color = Color { r :: Double, g :: Double, b :: Double }
 
-bgColor :: Color
-bgColor = Color 0.15 0.15 0.15
+bgColor, jointColor, jointColorSelected, jointColorRoot, limbColor :: Color
+bgColor             = Color 0.15 0.15 0.15
+jointColor          = Color 0.75 0.75 0.75
+jointColorSelected  = Color 1 0 0
+jointColorRoot      = Color 0.35 1 0.35
+limbColor           = Color 0.5 0.5 0.5
 
-jointColor :: Color
-jointColor = Color 0.75 0.75 0.75
-
-jointColorSelected :: Color
-jointColorSelected = Color 1 0 0
-
-limbColor :: Color
-limbColor = Color 0.5 0.5 0.5
-
-limbWidth :: Int
-limbWidth = 2
-
-jointRadius :: Int
-jointRadius = 4
-
-jointRadiusSelected  :: Int
+limbWidth, jointRadius, jointRadiusSelected :: Int
+limbWidth           = 2
+jointRadius         = 4
 jointRadiusSelected = 5
 
 setSourceColor :: Color -> Render ()
@@ -77,12 +68,28 @@ doRender = do
 
 renderTextInfo :: ReaderT ST.AppState Render ()
 renderTextInfo = do
-    animation <- asks ST.animation
+    s <- ask
+    let animation = ST.animation s
+        selectedJoint = ST.selectedJoint s
     lift $ do
         CR.setSourceRGB 1 1 1
         CR.moveTo 0 10
         CR.showText (A.currentTimeCode animation)
         CR.stroke
+        renderSelectedJointInfo s selectedJoint
+
+renderSelectedJointInfo :: ST.AppState -> Maybe J.Joint -> Render ()
+renderSelectedJointInfo _ Nothing = return ()
+renderSelectedJointInfo s (Just joint) = do
+    -- let jointInfoString = "R:" ++ show (J.jointR joint)
+    --     (trX, trY) = (ST.translateX s, ST.translateY s)
+    --     viewScale = ST.viewScale s
+    --     (screenX, screenY) = Sel.localToScreen viewScale trX trY (J.jointX joint) (J.jointY joint)
+    -- CR.moveTo (fromIntegral screenX + 10) (fromIntegral screenY + 10)
+    -- CR.showText jointInfoString
+    -- CR.stroke
+    return ()
+
 
 renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AppState Render ()
 renderLimb limb color = do
@@ -103,12 +110,18 @@ renderJoint j = do
     let scaleFactor = ST.viewScale st
 
     let isJointSelected = Sel.isSelected (J.jointId j) (ST.selectedJointIds st)
-    let radius = fromIntegral (if isJointSelected then jointRadiusSelected else jointRadius) / scaleFactor
-    let (x, y) = (J.jointX j, J.jointY j)
+        radius = fromIntegral (if isJointSelected then jointRadiusSelected else jointRadius) / scaleFactor
+        (x, y) = (J.jointX j, J.jointY j)
 
     lift $ do
-        setSourceColor $ if isJointSelected then jointColorSelected else jointColor
+        setSourceColor $ jointRenderColor j isJointSelected
         CR.arc x y radius 0 (pi * 2)
         CR.fill
+
+jointRenderColor :: J.Joint -> Bool -> Color
+jointRenderColor j isSelected
+    | isSelected = jointColorSelected
+    | B.isRoot j = jointColorRoot
+    | otherwise = jointColor
 
 

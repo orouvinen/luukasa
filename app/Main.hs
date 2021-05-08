@@ -87,11 +87,11 @@ buildUi stateRef = do
 
     -- Bottom grid items
     statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
-    Gtk.labelSetLabel statusBar "Luukasa started"
+    Gtk.labelSetText statusBar "Luukasa started"
 
     -- Event runners
     let runEventHandler = runEvent stateRef
-        runEventHandlerWithResult = \onError handler -> Gtk.labelSetLabel statusBar "" >> runEventWithResult stateRef onError handler
+        runEventHandlerWithResult = \onError handler -> Gtk.labelSetText statusBar "" >> runEventWithResult stateRef onError handler
 
     -- Event handlers
     _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
@@ -139,7 +139,7 @@ buildUi stateRef = do
     source: https://gtk-d.dpldocs.info/gtk.DrawingArea.DrawingArea.html
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
-        _ <- runEventHandlerWithResult (Gtk.labelSetLabel statusBar) (EV.canvasKeyPress ev)
+        _ <- runEventHandlerWithResult (Gtk.labelSetText statusBar) (EV.canvasKeyPress ev)
 
         -- For now, handle playback event here directly
         key <- Gdk.getEventKeyKeyval ev
@@ -155,8 +155,8 @@ buildUi stateRef = do
 
     -- Menu item actions
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >> Gtk.labelSetLabel statusBar "File saved."
-    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >> Gtk.labelSetLabel statusBar "File loaded."
+    _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >> Gtk.labelSetText statusBar "File saved."
+    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >> Gtk.labelSetText statusBar "File loaded."
 
     -- View local coordinate [0,0] at center of the canvas
     _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do

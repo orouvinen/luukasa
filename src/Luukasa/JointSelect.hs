@@ -3,6 +3,7 @@ module Luukasa.JointSelect
     , bodyToScreenCoordinates
     , screenToLocal
     , screenToLocalBody
+    , localToScreen
     , toggle
     , isSelected)
     where

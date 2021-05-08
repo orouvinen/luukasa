@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module Luukasa.AppState where
 
 import           Data.Foldable     (toList)
@@ -76,6 +78,14 @@ visibleBody = A.currentFrameData . animation
 setVisibleBody :: AppState -> Body -> AppState
 setVisibleBody s b =
     s { animation = A.setCurrentFrameData (animation s) b }
+
+selectedJoint :: AppState -> Maybe Joint
+selectedJoint s@(selectionSize -> 1) =
+    T.val <$> T.findNodeBy (\j -> J.jointId j == selectedJointId) body
+  where
+    body = B.root $ A.currentFrameData $ animation s
+    selectedJointId = head $ selectedJointIds s
+selectedJoint (selectionSize -> _) = Nothing
 
 selectedNonRootJoints :: AppState -> [Joint]
 selectedNonRootJoints s =
