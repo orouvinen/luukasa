@@ -32,6 +32,7 @@ import qualified Tree          as T (children, create, delete, findNode,
 
 import           Calc          (angle)
 import           Data.Aeson    (FromJSON, ToJSON)
+import           Data.Functor  ((<&>))
 import           GHC.Generics  (Generic)
 import qualified Units
 
@@ -159,10 +160,10 @@ getParentUnsafe body jointId =
         parentJoint = fromJust $ T.findNodeBy (\j -> J.jointId j == parentId) (root body)
         in T.val parentJoint
 
-getJointByIdUnsafe :: Body -> JointId -> Joint
-getJointByIdUnsafe body jointId =
-    let node = fromJust $ T.findNodeBy (\j -> J.jointId j == jointId) (root body)
-    in T.val node
+getJointById :: Body -> JointId -> Maybe Joint
+getJointById body jointId =
+    let node = T.findNodeBy (\j -> J.jointId j == jointId) (root body)
+    in T.val <$> node
 
 jointPositions :: Body -> [(Double, Double)]
 jointPositions body =
@@ -217,9 +218,10 @@ deleteJoint :: J.JointId -> Body -> Body
 deleteJoint jointId body =
     let body' = body { root = T.delete (\x -> J.jointId (T.val x) == jointId) (root body) }
     -- Ids of deleted joint's children
-        childIds = fst <$>
+        childIds =
             filter (\kvp -> snd kvp == jointId)
             (Map.toList (parentLookup body))
+            <&> fst
 
     -- New parent id for the said children
         newParentId = parentLookup body ! jointId
@@ -228,9 +230,7 @@ deleteJoint jointId body =
         parentLookup' = parentLookupUpdateForInherit childIds newParentId (parentLookup body)
 
         body'' = foldl' (\b childId -> updateChildGeometry b newParentId childId) body' childIds
-    in body''
-        { parentLookup = parentLookup'
-        }
+    in body'' { parentLookup = parentLookup' }
 
 parentLookupUpdateForInherit :: [J.JointId] -> J.JointId -> ParentLookup -> ParentLookup
 parentLookupUpdateForInherit childIds newParentId parentLookup' =
@@ -239,6 +239,10 @@ parentLookupUpdateForInherit childIds newParentId parentLookup' =
 
 updateChildGeometry :: Body -> J.JointId -> J.JointId -> Body
 updateChildGeometry body parentId childId =
-    let parent = getJointByIdUnsafe body parentId
-        child = getJointByIdUnsafe body childId
-    in body { root = T.replaceVal child (J.setChildAngleAndRadius parent child) (root body) }
+    let parent = getJointById body parentId
+        child = getJointById body childId
+        updatedChild = J.setChildAngleAndRadius <$> parent <*> child
+    in case updatedChild of
+        Nothing -> body
+        Just j -> body { root = T.replaceVal (fromJust child) j (root body) }
+

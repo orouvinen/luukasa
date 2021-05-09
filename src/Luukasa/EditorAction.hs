@@ -62,7 +62,6 @@ createJoint s x y =
 deleteSelectedJoints :: ST.AppState -> ActionResult
 deleteSelectedJoints s =
     let animation = ST.animation s
-        body = A.currentFrameData animation
         jointIds = J.jointId <$> ST.selectedNonRootJoints s
         deleteActions = [B.deleteJoint j | j <- jointIds]
         applyDelete = \b -> foldl' (&) b deleteActions
