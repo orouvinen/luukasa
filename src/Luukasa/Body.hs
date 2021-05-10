@@ -18,7 +18,6 @@ module Luukasa.Body
 
 import           Data.Function ((&))
 import           Data.List     (foldl')
-
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
 import           Data.Maybe    (fromJust)
@@ -245,4 +244,3 @@ updateChildGeometry body parentId childId =
     in case updatedChild of
         Nothing -> body
         Just j -> body { root = T.replaceVal (fromJust child) j (root body) }
-

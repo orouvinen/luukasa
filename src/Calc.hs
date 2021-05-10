@@ -1,15 +1,13 @@
 {-# LANGUAGE ViewPatterns #-}
 module Calc (rotd, distance, angle) where
 
-import           Units (Degrees, deg, getDegrees, mkDegrees, mkRadians)
+import           Data.Fixed (mod')
+import           Units      (Degrees, deg, getDegrees, mkDegrees, mkRadians)
 
 rotd :: Degrees -> Double -> Degrees
 rotd (getDegrees -> x) delta = mkDegrees $ rotated $ x + delta
   where
-      rotated degrees
-        | degrees >= 360    = degrees - 360
-        | degrees < 0       = degrees + 360
-        | otherwise         = degrees
+    rotated degrees = mod' degrees 360
 
 distance :: Double -> Double -> Double -> Double -> Double
 distance x y x' y' =
@@ -25,4 +23,3 @@ angle parentX parentY childX childY =
         -- also flip y coordinate for screen
         a = deg $ mkRadians $ atan2 dx (-dy)
     in rotd a 90
-
