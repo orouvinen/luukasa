@@ -3,12 +3,14 @@
 
 module Luukasa.EventHandler where
 
-import           Control.Monad          (unless, when)
+import           Control.Monad          (unless, void, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
+import           Data.Foldable          (forM_)
 import           Data.GI.Base           (AttrOp ((:=)), new)
 import           Data.Maybe             (fromJust)
+import           Data.Text              (Text, pack, unpack)
 import qualified GI.Gdk                 as Gdk
 import qualified GI.Gtk                 as Gtk
 import           Luukasa.Animation
@@ -184,41 +186,54 @@ setViewTranslate trX trY = do
     state <- get
     put state { translateX = trX, translateY = trY }
 
-menuSave :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
+
+menuSave :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do
-    state <- get
-    filename <- saveFileChooserDialog w
-
+    filename <- currentFileName <$> get
     case filename of
-        Nothing -> return ()
-        Just f  -> do
-            let json = encode $ ST.animation state
-            liftIO $ BS.writeFile f json
+        Nothing -> void $ menuSaveAs w
+        Just f  -> writeAnimationToFile f
+    return filename
 
+menuSaveAs :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+menuSaveAs w = do
+    filename <- saveFileChooserDialog w
+    forM_ filename writeAnimationToFile
+    return filename
 
-menuOpen :: (HasAppState m, MonadIO m) => Gtk.Window -> m ()
+writeAnimationToFile :: (HasAppState m, MonadIO m) => Text -> m ()
+writeAnimationToFile filename = do
+    state <- get
+    let json = encode $ ST.animation state
+    liftIO $ BS.writeFile (unpack filename) json
+    put state { currentFileName = Just filename }
+
+-- TODO: (the function) could use a bit of woman's touch
+menuOpen :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuOpen w = do
     state <- get
     filename <- openFileChooserDialog w
 
     case filename of
-        Nothing -> return ()
+        Nothing -> return Nothing
         Just f -> do
-            json <- liftIO $ BS.readFile f
+            json <- liftIO $ BS.readFile (unpack f)
             let animation' = decode json
 
             case animation' of
-                Nothing -> return ()
-                Just a  -> put state { ST.animation = a }
+                Nothing -> return Nothing
+                Just a  -> do
+                    put state { ST.animation = a, currentFileName = Just f }
+                    return filename
 
 
-saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe String)
+saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe Text)
 saveFileChooserDialog = fileChooserDialog Gtk.FileChooserActionSave
 
-openFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe String)
+openFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe Text)
 openFileChooserDialog = fileChooserDialog Gtk.FileChooserActionOpen
 
-fileChooserDialog :: MonadIO m => Gtk.FileChooserAction -> Gtk.Window -> m (Maybe String)
+fileChooserDialog :: MonadIO m => Gtk.FileChooserAction -> Gtk.Window -> m (Maybe Text)
 fileChooserDialog actionType mainWindow = do
     dlg <- new Gtk.FileChooserDialog [ #title := "Save animation"
                                      , #action := actionType
@@ -229,9 +244,14 @@ fileChooserDialog actionType mainWindow = do
     _ <- Gtk.dialogAddButton dlg "gtk-cancel" $ (toEnum . fromEnum) Gtk.ResponseTypeCancel
 
     Gtk.widgetShow dlg
-    _ <- Gtk.dialogRun dlg
-
+    result <- fromIntegral <$> Gtk.dialogRun dlg
     filename <- Gtk.fileChooserGetFilename dlg
-    Gtk.widgetDestroy dlg
-    return filename
 
+    let resultFilename =
+            case toEnum result of
+                Gtk.ResponseTypeAccept -> pack <$> filename
+                _                      -> Nothing
+
+
+    Gtk.widgetDestroy dlg
+    return resultFilename

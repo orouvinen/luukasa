@@ -13,6 +13,7 @@ import           Control.Monad.IO.Class    (MonadIO (liftIO))
 import           Control.Monad.Reader      (MonadReader, ReaderT, ask,
                                             runReaderT)
 import           Data.Maybe                (fromJust)
+import qualified Data.Text                 as T
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             HasAppState, actionState, get,
                                             initialState, put)
@@ -75,6 +76,7 @@ buildUi stateRef = do
     -- Menu items
     fileOpen <- GO.builderGetObject builder "fileOpen" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
     fileSave <- GO.builderGetObject builder "fileSave" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
+    fileSaveAs <- GO.builderGetObject builder "fileSaveAs" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
     fileQuit <- GO.builderGetObject builder "fileQuit" >>= Gtk.unsafeCastTo Gtk.ImageMenuItem . fromJust
 
     -- Button bar buttons
@@ -155,8 +157,9 @@ buildUi stateRef = do
 
     -- Menu item actions
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >> Gtk.labelSetText statusBar "File saved."
-    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >> Gtk.labelSetText statusBar "File loaded."
+    _ <- Gtk.onMenuItemActivate fileSaveAs $ runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar
+    _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar
+    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar
 
     -- View local coordinate [0,0] at center of the canvas
     _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do
@@ -166,6 +169,10 @@ buildUi stateRef = do
         return ()
 
     Gtk.widgetShowAll window
+
+showFileResult :: T.Text -> Gtk.Label -> Maybe T.Text -> IO ()
+showFileResult _ _ Nothing = return ()
+showFileResult verb label (Just filename) = Gtk.labelSetText label $ filename <> " " <> verb
 
 
 playbackHandler :: IORef AppState -> Gtk.DrawingArea -> Gtk.Button -> IO ()

@@ -47,6 +47,7 @@ data AppState = AppState
     , jointLockMode     :: JointLockMode
     , dragMode          :: DragMode
     , frameStart        :: Maybe TimestampUs
+    , currentFileName   :: Maybe Text
     } deriving (Show)
 
 initialState :: AppState
@@ -62,6 +63,7 @@ initialState = AppState
     , jointLockMode = NoLock
     , dragMode = DragRotate
     , frameStart = Nothing
+    , currentFileName = Nothing
     }
 
 isPlaybackOn :: AppState -> Bool
