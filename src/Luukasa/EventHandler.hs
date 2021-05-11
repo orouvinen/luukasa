@@ -3,7 +3,7 @@
 
 module Luukasa.EventHandler where
 
-import           Control.Monad          (unless, void, when)
+import           Control.Monad          (forM, join, unless, void, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
@@ -208,23 +208,16 @@ writeAnimationToFile filename = do
     liftIO $ BS.writeFile (unpack filename) json
     put state { currentFileName = Just filename }
 
--- TODO: (the function) could use a bit of woman's touch
 menuOpen :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuOpen w = do
     state <- get
     filename <- openFileChooserDialog w
 
-    case filename of
-        Nothing -> return Nothing
-        Just f -> do
-            json <- liftIO $ BS.readFile (unpack f)
-            let animation' = decode json
-
-            case animation' of
-                Nothing -> return Nothing
-                Just a  -> do
-                    put state { ST.animation = a, currentFileName = Just f }
-                    return filename
+    join <$> forM filename (\f -> do
+        json <- liftIO $ BS.readFile (unpack f)
+        forM (decode json) (\a -> do
+            put state { ST.animation = a, currentFileName = Just f }
+            return f))
 
 
 saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe Text)
