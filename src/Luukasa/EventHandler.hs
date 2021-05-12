@@ -233,7 +233,13 @@ fileChooserDialog actionType mainWindow = do
                                      ]
 
     Gtk.windowSetTransientFor dlg $ Just mainWindow
-    _ <- Gtk.dialogAddButton dlg "gtk-save" $ (toEnum . fromEnum) Gtk.ResponseTypeAccept
+
+    _ <- Gtk.dialogAddButton dlg
+            (case actionType of
+                Gtk.FileChooserActionSave -> "gtk-save"
+                _                         -> "gtk-open")
+            $ (toEnum . fromEnum) Gtk.ResponseTypeAccept
+
     _ <- Gtk.dialogAddButton dlg "gtk-cancel" $ (toEnum . fromEnum) Gtk.ResponseTypeCancel
 
     Gtk.widgetShow dlg
