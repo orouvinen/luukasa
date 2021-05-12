@@ -159,7 +159,7 @@ buildUi stateRef = do
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
     _ <- Gtk.onMenuItemActivate fileSaveAs $ runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar
     _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar
-    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar
+    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar >> Gtk.widgetQueueDraw canvas
 
     -- View local coordinate [0,0] at center of the canvas
     _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do
