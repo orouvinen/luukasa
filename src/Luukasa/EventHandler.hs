@@ -1,10 +1,14 @@
-{-# LANGUAGE OverloadedLabels  #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedLabels      #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Luukasa.EventHandler where
 
 import           Control.Monad          (forM, join, unless, void, when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.State    (MonadState, get, gets, modify, put)
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
 import           Data.Foldable          (forM_)
@@ -16,8 +20,8 @@ import qualified GI.Gtk                 as Gtk
 import           Luukasa.Animation
 import           Luukasa.AppState       as ST
 import           Luukasa.Common
-import           Luukasa.EditorAction   as E (Action (..), SelectMode (..),
-                                              dispatchAction)
+import           Luukasa.EditorAction   as E (Action (..), ActionResult,
+                                              SelectMode (..), dispatchAction)
 import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
                                          clickPos, getScrollDirection,
@@ -26,27 +30,21 @@ import           Luukasa.Joint          (JointLockMode (..))
 
 type EventResult a = Either ErrorMessage a
 
-
-
-toEventResult :: Monad m => Either ErrorMessage AppState -> a -> m (EventResult a)
-toEventResult editorActionResult retval =
-    return $ case editorActionResult of
+toEventResult :: Monad m => ActionResult -> a -> m (EventResult a)
+toEventResult res retval =
+    return $ case res of
         Right _  -> Right retval
         Left err -> Left err
 
-updateAppState :: HasAppState m => Either a AppState -> m ()
-updateAppState result = do
-    case result of
-        Left _         -> return ()
-        Right newState -> put newState
+updateAppState :: MonadState AppState m => Either a AppState -> m ()
+updateAppState = \case
+    Left _         -> return ()
+    Right newState -> put newState
 
+selectLockMode :: MonadState AppState m => JointLockMode -> m ()
+selectLockMode lockMode = modify (\s -> s { jointLockMode = lockMode })
 
-selectLockMode :: HasAppState m => JointLockMode -> m ()
-selectLockMode lockMode = do
-    appState <- get
-    put appState { jointLockMode = lockMode }
-
-canvasPrimaryMouseButtonClick :: (HasAppState m, HasMouseEvent m) => Gdk.EventButton -> m ()
+canvasPrimaryMouseButtonClick :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonClick e = do
     appState <- get
 
@@ -65,26 +63,21 @@ canvasPrimaryMouseButtonClick e = do
     updateAppState result
 
 
-canvasPrimaryMouseButtonRelease :: HasAppState m => Gdk.EventButton -> m ()
+canvasPrimaryMouseButtonRelease :: MonadState AppState m => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonRelease _ = do
-    appState <- get
-    unless (isPlaybackOn appState) $ put appState { actionState = Idle }
+    s <- get
+    unless (isPlaybackOn s) $ put s { actionState = Idle }
 
-startPlayback :: HasAppState m => TimerCallbackId -> TimestampUs -> m ()
-startPlayback timerCallbackId timestamp = do
-    appState <- get
-    put appState { actionState = AnimationPlayback timerCallbackId
-                 , frameStart = Just timestamp
-                 }
+startPlayback :: MonadState AppState m => TimerCallbackId -> TimestampUs -> m ()
+startPlayback timerCallbackId timestamp =
+    modify (\s -> s { actionState = AnimationPlayback timerCallbackId
+                    , frameStart = Just timestamp
+                    })
 
-stopPlayback :: HasAppState m => m ()
-stopPlayback = do
-    appState <- get
-    put appState { actionState = Idle
-                 , frameStart = Nothing
-                 }
+stopPlayback :: MonadState AppState m => m ()
+stopPlayback = modify (\s -> s { actionState = Idle, frameStart = Nothing })
 
-playbackTick :: HasAppState m => TimestampUs -> m Bool
+playbackTick :: MonadState AppState m => TimestampUs -> m Bool
 playbackTick timestamp = do
     s <- get
     let frameIntervalUs = (1.0 / (fromIntegral (fps $ animation s) :: Double)) * 1000 * 1000
@@ -100,26 +93,17 @@ playbackTick timestamp = do
 
     return renderNeeded
 
-canvasKeyPress :: (HasAppState m, HasKeyEvent m) => Gdk.EventKey -> m (EventResult ())
+canvasKeyPress :: (MonadState AppState m, HasKeyEvent m) => Gdk.EventKey -> m (EventResult ())
 canvasKeyPress eventKey = do
-    appState <- get
+    s <- get
     key <- getKey eventKey
 
-    -- print $ actionState appState
-
-    let dispatch = dispatchAction appState
-    --     debugJoints = printJoints appState
-    --     debugState = printState appState
-
-    -- liftIO $ putStr $ case key of
-    --     Gdk.KEY_1 -> "JOINTS: " ++ debugJoints
-    --     Gdk.KEY_2 -> "STATE: " ++ debugState
-    --     _         -> ""
+    let dispatch = dispatchAction s
 
     let result = case key of
             Gdk.KEY_J       ->
-                if selectionSize appState == 1 -- Parent joint needs to be selected
-                    then Right appState { actionState = PlacingNewJoint }
+                if selectionSize s == 1 -- Parent joint needs to be selected
+                    then Right s { actionState = PlacingNewJoint }
                     else Left "Parent joint needs to be selected in order to create a joint"
             Gdk.KEY_Delete      -> dispatch E.DeleteSelected
             Gdk.KEY_Up          -> dispatch $ E.RotateSelected 2
@@ -128,7 +112,7 @@ canvasKeyPress eventKey = do
             Gdk.KEY_KP_Subtract -> dispatch E.DeleteFrame
             Gdk.KEY_Left        -> dispatch $ E.FrameStep (-1)
             Gdk.KEY_Right       -> dispatch $ E.FrameStep 1
-            _                   -> Right appState
+            _                   -> Right s
 
     updateAppState result
     toEventResult result ()
@@ -136,9 +120,8 @@ canvasKeyPress eventKey = do
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
 
-canvasScrollWheel :: (HasAppState m, HasMouseEvent m) => Gdk.EventScroll -> m ()
+canvasScrollWheel :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventScroll -> m ()
 canvasScrollWheel eventScroll = do
-    appState <- get
     scrollDirection <- getScrollDirection eventScroll
 
     let scaleChange =
@@ -146,10 +129,9 @@ canvasScrollWheel eventScroll = do
             then -scrollWheelScaleStep
             else scrollWheelScaleStep
 
-    let newState = appState { viewScale = viewScale appState + scaleChange }
-    put newState
+    modify (\s -> s { viewScale = viewScale s + scaleChange })
 
-canvasMouseMotion :: (HasAppState m, HasMouseEvent m) => Gdk.EventMotion -> m ()
+canvasMouseMotion :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventMotion -> m ()
 canvasMouseMotion e = do
     appState <- get
 
@@ -176,39 +158,33 @@ canvasMouseMotion e = do
         let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
         updateAppState result
 
-setViewScale :: HasAppState m => Double -> m ()
-setViewScale scaleFactor = do
-    state <- get
-    put state { viewScale = scaleFactor }
+setViewScale :: MonadState AppState m => Double -> m ()
+setViewScale scaleFactor = modify (\s -> s { viewScale = scaleFactor })
 
-setViewTranslate :: HasAppState m => Double -> Double -> m ()
-setViewTranslate trX trY = do
-    state <- get
-    put state { translateX = trX, translateY = trY }
+setViewTranslate :: MonadState AppState m => Double -> Double -> m ()
+setViewTranslate trX trY = modify (\s -> s { translateX = trX, translateY = trY })
 
-
-menuSave :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+menuSave :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do
-    filename <- currentFileName <$> get
+    filename <- gets currentFileName
     case filename of
         Nothing -> void $ menuSaveAs w
         Just f  -> writeAnimationToFile f
     return filename
 
-menuSaveAs :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+menuSaveAs :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuSaveAs w = do
     filename <- saveFileChooserDialog w
     forM_ filename writeAnimationToFile
     return filename
 
-writeAnimationToFile :: (HasAppState m, MonadIO m) => Text -> m ()
+writeAnimationToFile :: (MonadState AppState m, MonadIO m) => Text -> m ()
 writeAnimationToFile filename = do
-    state <- get
-    let json = encode $ ST.animation state
+    json <- gets $ encode . ST.animation
     liftIO $ BS.writeFile (unpack filename) json
-    put state { currentFileName = Just filename }
+    modify (\s -> s { currentFileName = Just filename })
 
-menuOpen :: (HasAppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+menuOpen :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuOpen w = do
     state <- get
     filename <- openFileChooserDialog w

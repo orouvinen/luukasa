@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
 import           Data.IORef                (IORef, newIORef, readIORef,
@@ -12,11 +13,11 @@ import           Control.Monad             (when, (>=>))
 import           Control.Monad.IO.Class    (MonadIO (liftIO))
 import           Control.Monad.Reader      (MonadReader, ReaderT, ask,
                                             runReaderT)
+import           Control.Monad.State       (MonadState, get, put)
 import           Data.Maybe                (fromJust)
 import qualified Data.Text                 as T
 import           Luukasa.AppState          (ActionState (..), AppState,
-                                            HasAppState, actionState, get,
-                                            initialState, put)
+                                            actionState, initialState)
 import           Luukasa.Common            (ErrorMessage)
 import           Luukasa.Event.Keyboard
 import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
@@ -29,13 +30,11 @@ import qualified Luukasa.Render            as Render (render)
 newtype EventM a = EventM { runEventM :: ReaderT (IORef AppState) IO a }
     deriving (Functor, Applicative, Monad, MonadReader (IORef AppState), MonadIO)
 
-instance HasAppState EventM where
+instance MonadState AppState EventM where
     get = ask >>= liftIO . readIORef
     put s = ask >>= \stateRef -> liftIO $ writeIORef stateRef s
-
 instance HasKeyEvent EventM where
     getKey = Gdk.getEventKeyKeyval >=> Gdk.keyvalToUpper
-
 instance HasMouseEvent EventM where
     getScrollDirection = Gdk.getEventScrollDirection
     clickPos e = (,) <$> Gdk.getEventButtonX e <*> Gdk.getEventButtonY e
@@ -177,21 +176,18 @@ showFileResult verb label (Just filename) = Gtk.labelSetText label $ filename <>
 
 playbackHandler :: IORef AppState -> Gtk.DrawingArea -> Gtk.Button -> IO ()
 playbackHandler stateRef canvas btnPlayback = do
+    let runEventHandler = runEvent stateRef
+
     appState <- readIORef stateRef
 
     case actionState appState of
-        AnimationPlayback _ -> do Gtk.buttonSetLabel btnPlayback "Play"
-        Idle                -> do Gtk.buttonSetLabel btnPlayback "Stop"
-        _                   -> return ()
-
-    let runEventHandler = runEvent stateRef
-
-    case actionState appState of
         AnimationPlayback callbackId -> do
+            Gtk.buttonSetLabel btnPlayback "Play"
             runEventHandler EV.stopPlayback
             Gtk.widgetRemoveTickCallback canvas callbackId
 
         Idle -> do
+            Gtk.buttonSetLabel btnPlayback "Stop"
             tickCallbackId <- Gtk.widgetAddTickCallback canvas (\ _ frameClock -> do
                 -- Gdk.frameClockGetFrameTime frameClock >>= runEventHandler . EV.playbackTick
                 timestamp <- Gdk.frameClockGetFrameTime frameClock

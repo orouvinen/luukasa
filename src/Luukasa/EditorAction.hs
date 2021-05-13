@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Luukasa.EditorAction (Action(..), SelectMode(..), dispatchAction, ErrorMessage) where
+module Luukasa.EditorAction (Action(..), SelectMode(..), dispatchAction, ErrorMessage, ActionResult) where
 
 import           Data.Foldable       (foldl')
 import           Data.Function       ((&))
