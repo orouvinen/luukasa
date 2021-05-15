@@ -15,7 +15,6 @@ import qualified Tree                as T
 
 data SelectMode = Set | Toggle
 data Action
-    -- Joint operations
     = CreateJoint Int Int
     | DeleteSelected
     | TrySelect Int Int SelectMode
@@ -25,10 +24,10 @@ data Action
     | DragRotateSelected Double Double
     | LevelSelectedRadiusesToMin
     | LevelSelectedRadiusesToMax
-    -- Animation
     | CreateFrame
     | DeleteFrame
     | FrameStep Int
+    | ApplyToAnimationJointWithId J.JointId (J.Joint -> J.Joint)
 
 
 type ActionResult = Either ErrorMessage ST.AppState
@@ -36,6 +35,7 @@ type ActionResult = Either ErrorMessage ST.AppState
 dispatchAction :: ST.AppState -> Action -> ActionResult
 dispatchAction s e =
     case e of
+        ApplyToAnimationJointWithId jointId f -> modifyAnimationJointWith s jointId f
         CreateJoint x y            -> createJoint s x y
         DeleteSelected             -> deleteSelectedJoints s
         TrySelect x y selectMode   -> trySelect s x y selectMode
@@ -48,6 +48,11 @@ dispatchAction s e =
         FrameStep n                -> frameStep s n
         LevelSelectedRadiusesToMin -> levelSelectedRadiuses s minimum
         LevelSelectedRadiusesToMax -> levelSelectedRadiuses s maximum
+
+modifyAnimationJointWith :: ST.AppState -> J.JointId -> (J.Joint -> J.Joint) -> ActionResult
+modifyAnimationJointWith s jointId f =
+    Right s { ST.animation = fmap (B.applyToJoint jointId f) (ST.animation s)}
+
 
 createJoint :: ST.AppState -> Int -> Int -> ActionResult
 createJoint s x y =
@@ -132,6 +137,7 @@ levelSelectedRadiuses s selectRadius =
     in Right
         $ withCurrentFrameSelectedJoints s
         $ B.setJointRadius radius
+
 
 
 {- |

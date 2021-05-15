@@ -6,31 +6,40 @@
 
 module Luukasa.EventHandler where
 
-import           Control.Monad          (forM, join, unless, void, when)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.State    (MonadState, get, gets, modify, put)
-import           Data.Aeson             (decode, encode)
-import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
-import           Data.Foldable          (forM_)
-import           Data.Function          ((&))
-import           Data.GI.Base           (AttrOp ((:=)), new)
-import           Data.Maybe             (fromJust)
-import           Data.Text              (Text, pack, unpack)
-import qualified GI.Gdk                 as Gdk
-import qualified GI.Gtk                 as Gtk
-import qualified Luukasa.Animation      as Animation
-import           Luukasa.AppState       (ActionState (..), AppState,
-                                         DragMode (..), DragState (..))
-import qualified Luukasa.AppState       as ST
-import           Luukasa.Common         (ErrorMessage, TimerCallbackId,
-                                         TimestampUs)
-import           Luukasa.EditorAction   as E (Action (..), ActionResult,
-                                              SelectMode (..), dispatchAction)
-import           Luukasa.Event.Keyboard (HasKeyEvent (..))
-import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
-                                         clickPos, getScrollDirection,
-                                         motionModifiers, motionPos)
-import           Luukasa.Joint          (JointLockMode (..))
+import           Control.Monad              (foldM, forM, join, unless, void,
+                                             when)
+import           Control.Monad.IO.Class     (MonadIO, liftIO)
+import           Control.Monad.State        (MonadState, get, gets, modify, put)
+import           Data.Aeson                 (decode, encode)
+import qualified Data.ByteString.Lazy       as BS (readFile, writeFile)
+import           Data.Foldable              (forM_)
+import           Data.Function              ((&))
+import           Data.GI.Base               (AttrOp ((:=)), new)
+import           Data.Int                   (Int32)
+import           Data.Map                   ((!))
+import qualified Data.Map                   as Map
+import           Data.Maybe                 (fromJust)
+import           Data.Text                  (Text, pack, unpack)
+import qualified GI.Gdk                     as Gdk
+import qualified GI.Gtk                     as Gtk
+import qualified Luukasa.Animation          as Animation
+import qualified Luukasa.Animation          as A
+import           Luukasa.AppState           (ActionState (..), AppState,
+                                             DragMode (..), DragState (..))
+import qualified Luukasa.AppState           as ST
+import qualified Luukasa.Body               as B
+import           Luukasa.Common             (ErrorMessage, TimerCallbackId,
+                                             TimestampUs)
+import           Luukasa.EditorAction       as E (Action (..), ActionResult,
+                                                  SelectMode (..),
+                                                  dispatchAction)
+import           Luukasa.Event.Keyboard     (HasKeyEvent (..))
+import           Luukasa.Event.Mouse        (HasMouseEvent, clickModifiers,
+                                             clickPos, getScrollDirection,
+                                             motionModifiers, motionPos)
+import           Luukasa.Event.Ui.UiElement
+import           Luukasa.Joint              (Joint, JointId, JointLockMode (..))
+import qualified Luukasa.Joint              as J
 
 
 type EventResult a = Either ErrorMessage a
@@ -66,8 +75,8 @@ canvasPrimaryMouseButtonClick e = do
 
     let dispatch = dispatchAction appState
         result = case ST.actionState appState of
-            ST.PlacingNewJoint -> dispatch $ E.CreateJoint x y
-            ST.Idle            -> dispatch $ E.TrySelect x y (if toggleSelect then Toggle else Set)
+            PlacingNewJoint -> dispatch $ E.CreateJoint x y
+            Idle            -> dispatch $ E.TrySelect x y $ if toggleSelect then Toggle else Set
             _               -> Right appState
 
     updateAppState result
@@ -183,6 +192,64 @@ setViewScale scaleFactor = modify (\s -> s { ST.viewScale = scaleFactor })
 
 setViewTranslate :: MonadState AppState m => Double -> Double -> m ()
 setViewTranslate trX trY = modify (\s -> s { ST.translateX = trX, ST.translateY = trY })
+
+modifyAnimationJointWith :: (MonadState AppState m) => JointId -> (Joint -> Joint) -> m ()
+modifyAnimationJointWith jointId f = do
+    appState <- get
+    E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId f) & updateAppState
+
+selectJoint :: MonadState AppState m => JointId -> m ()
+selectJoint jointId = modify (\s -> s { ST.selectedJointIds = [jointId] })
+
+updateJointList
+    :: (MonadState AppState m, HasUiListStore m)
+    => Gtk.ListStore
+    -> Map.Map JointId [Gtk.GValue]
+    -> m ()
+updateJointList jointListStore jointValues = do
+    appState <- get
+    clearListStore jointListStore
+
+    let joints = B.toJointList $ A.currentFrameData (ST.animation appState)
+
+    iterLookup <- foldM (\lkup j -> do
+            iter <- insertListRow jointListStore (jointValues ! J.jointId j)
+            iterAsString <- getIterAsString jointListStore iter
+            return $ Map.insert iterAsString (J.jointId j) lkup)
+        (Map.empty :: Map.Map Text JointId)
+        joints
+
+    modify (\s -> s { ST.jointIterLookup = iterLookup })
+
+{- TODO: this is awful in few different ways.
+Of course, everything has potential for refactoring, but oh boy
+has this some priority..
+
+Anyway, the mission here is to update
+    1. joint value on UI (visual)
+    2. joint data in AppState (factual)
+-}
+setJointAttribute
+    :: (MonadState AppState m, HasUiListStore m)
+    => Gtk.ListStore -- ^ list store to update
+    -> Text          -- ^ TreeView path as given by Gdk
+    -> Gtk.GValue    -- ^ Value to set to desired cell
+    -> Int32         -- ^ Column number for the data
+    -> (Joint -> Joint) -- ^ Function to update joint data
+    -> m ()
+setJointAttribute jointListStore path cellVal colNum updateJoint = do
+    mbIter <- getIterFromString jointListStore path
+    case mbIter of
+        Nothing -> return ()
+        Just iter -> do
+            listStoreSetValue jointListStore iter colNum cellVal
+
+            appState <- get
+            let jointIterLookup = ST.jointIterLookup appState
+                jointId = jointIterLookup ! path
+            E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId updateJoint) & updateAppState
+
+
 
 menuSave :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do

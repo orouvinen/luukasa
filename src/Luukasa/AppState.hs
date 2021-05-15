@@ -6,6 +6,8 @@ module Luukasa.AppState where
 import           Data.Foldable     (toList)
 import           Data.Text         (Text)
 
+import           Data.Map          (Map)
+import qualified Data.Map          as Map
 import           Data.Maybe        (mapMaybe)
 import           Luukasa.Animation (Animation)
 import qualified Luukasa.Animation as A
@@ -45,6 +47,8 @@ data AppState = AppState
     , dragMode          :: DragMode
     , frameStart        :: Maybe TimestampUs
     , currentFileName   :: Maybe Text
+    , jointIterLookup   :: Map Text J.JointId
+    , isCellEditActive  :: Bool
     } deriving (Show)
 
 initialState :: AppState
@@ -61,6 +65,8 @@ initialState = AppState
     , dragMode = DragRotate
     , frameStart = Nothing
     , currentFileName = Nothing
+    , jointIterLookup = Map.empty
+    , isCellEditActive = False
     }
 
 isPlaybackOn :: AppState -> Bool

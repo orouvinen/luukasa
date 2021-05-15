@@ -3,9 +3,12 @@
 module Luukasa.Body
     ( Body(..)
     , create
+    , toJointList
     , deleteJoint
     , isRoot
+    , applyToJoint
     , getParentUnsafe
+    , getJointById
     , jointPositions
     , limbSegments
     , rootJointId
@@ -17,11 +20,12 @@ module Luukasa.Body
     , createJoint)
     where
 
+import           Data.Foldable (toList)
 import           Data.Function ((&))
 import           Data.List     (foldl')
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
-import           Data.Maybe    (fromJust)
+import           Data.Maybe    (fromJust, fromMaybe)
 import           Luukasa.Joint (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint as J
 import           Tree          (Tree)
@@ -55,6 +59,7 @@ create :: Body
 create =
     let rootJoint = J.Joint
             { J.jointId = rootJointId
+            , J.jointName = Nothing
             , J.jointX = 0
             , J.jointY = 0
             , J.jointLocalRot = 0
@@ -67,6 +72,9 @@ create =
         , translateY = 0
         , parentLookup = Map.empty
         }
+
+toJointList :: Body -> [J.Joint]
+toJointList = toList . root
 
 rotateJointTowards :: Double -> Double -> JointLockMode -> Joint -> Body -> Body
 rotateJointTowards x y lockMode joint body =
@@ -161,6 +169,13 @@ addJoint body parent joint = body
     , parentLookup = Map.insert (J.jointId joint) (J.jointId parent) (parentLookup body)
     }
 
+applyToJoint :: JointId -> (Joint -> Joint) -> Body -> Body
+applyToJoint jointId f body =
+    let old = getJointById body jointId
+        new = f <$> old
+        body' = replaceJoint <$> old <*> new <*> Just body
+    in fromMaybe body body'
+
 replaceJoint :: Joint -> Joint -> Body -> Body
 replaceJoint old new body  =
     body { root = T.replaceVal old new (root body)}
@@ -206,6 +221,7 @@ createJoint parentJointId jointId x y body =
                 parent
                 (J.Joint
                     { J.jointX = x
+                    , J.jointName = Nothing
                     , J.jointY = y
                     , J.jointId = jointId
                     , J.jointLocalRot = 0

@@ -1,22 +1,28 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-import           Data.IORef                (IORef, newIORef, readIORef)
+import           Data.IORef                (IORef, newIORef, readIORef,
+                                            writeIORef)
 import           GI.Cairo.Render.Connector (renderWithContext)
 import qualified GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
 import qualified GI.Gtk.Objects            as GO
 
 import           Control.Exception         (IOException, catch)
-import           Control.Monad             (when)
+import           Control.Monad             (foldM, unless, when)
+import           Data.Foldable             (Foldable (toList))
+import           Data.Map                  (Map, (!))
+import qualified Data.Map                  as Map
 import           Data.Maybe                (fromJust)
 import qualified Data.Text                 as T
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             actionState, initialState)
+import qualified Luukasa.AppState          as ST
+import qualified Luukasa.Body              as B
 import           Luukasa.Common            (ErrorMessage)
 import           Luukasa.Event.EventM      (EventM, runEvent)
 import qualified Luukasa.EventHandler      as EV
-import qualified Luukasa.Joint             as Joint
+import qualified Luukasa.Joint             as J
 import qualified Luukasa.Render            as Render (render)
 
 main :: IO ()
@@ -36,6 +42,22 @@ runEventWithResult stateRef onError eventHandler = do
         Left err -> onError err
         Right _  -> return ()
     return result
+
+jointToGValues :: J.Joint -> IO [Gtk.GValue]
+jointToGValues j = do
+    jx <- Gtk.toGValue $ J.jointX j
+    jy <- Gtk.toGValue $ J.jointY j
+    jName <- Gtk.toGValue $ J.jointName j
+    return [jName, jx, jy]
+
+jointsAsGValues :: IORef AppState -> IO (Map J.JointId [Gtk.GValue])
+jointsAsGValues stateRef = do
+    joints <- toList . B.root . ST.visibleBody <$> readIORef stateRef
+    foldM (\lkup j -> do
+            jointGValues <- jointToGValues j
+            return $ Map.insert (J.jointId j) jointGValues lkup)
+        Map.empty
+        joints
 
 buildUi :: IORef AppState -> IO ()
 buildUi stateRef = do
@@ -63,27 +85,60 @@ buildUi stateRef = do
     btnAlignRadiusMin <- GO.builderGetObject builder "btnAlignRadiusMin" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
     btnAlignRadiusMax <- GO.builderGetObject builder "btnAlignRadiusMax" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
 
+    -- Joints list
+    jointListTreeView <- GO.builderGetObject builder "jointList" >>= Gtk.unsafeCastTo Gtk.TreeView . fromJust
+    jointListStore <- GO.builderGetObject builder "jointListStore" >>= Gtk.unsafeCastTo Gtk.ListStore . fromJust
+    -- Joint list columns
+    jointNameCell <- GO.builderGetObject builder "colJointName" >>= Gtk.unsafeCastTo Gtk.CellRendererText . fromJust
+
+
     -- Bottom grid items
     statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
     Gtk.labelSetText statusBar "Luukasa started"
 
     -- Event runners
     let runEventHandler = runEvent stateRef
-        runEventHandlerWithResult = \onError handler -> Gtk.labelSetText statusBar "" >> runEventWithResult stateRef onError handler
+
+        runEventHandlerWithResult = \onError handler -> do
+            Gtk.labelSetText statusBar ""
+            runEventWithResult stateRef onError handler
+
+        updateJointList = do
+            jointGValues <- jointsAsGValues stateRef
+            runEventHandler $ EV.updateJointList jointListStore jointGValues
 
     -- Event handlers
-    _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
 
-    _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Joint.LockNone
-    _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Joint.LockDrag
-    _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Joint.LockRotate
+    _ <- Gtk.onCellRendererTextEdited jointNameCell $ \path enteredText -> do
+            newVal <- Gtk.toGValue (Just enteredText)
+            runEventHandler $ EV.setJointAttribute jointListStore path newVal 0 (\j -> j { J.jointName = Just enteredText })
+            s <- readIORef stateRef
+            writeIORef stateRef s { ST.isCellEditActive = False }
+
+    _ <- Gtk.onCellRendererEditingStarted jointNameCell $ \_ _ -> do
+        s <- readIORef stateRef
+        writeIORef stateRef s { ST.isCellEditActive = True }
+
+    _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
 
     _ <- Gtk.onButtonClicked btnAlignRadiusMin $ runEventHandler EV.alignRadiusesToMin >> Gtk.widgetQueueDraw canvas
     _ <- Gtk.onButtonClicked btnAlignRadiusMax $ runEventHandler EV.alignRadiusesToMax >> Gtk.widgetQueueDraw canvas
 
+    _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode J.LockNone
+    _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode J.LockDrag
+    _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode J.LockRotate
+
     _ <- Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
 
     _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
+
+    _ <- Gtk.onTreeViewRowActivated jointListTreeView $ \path _ -> do
+        jointIterLookup <- ST.jointIterLookup <$> readIORef stateRef
+        pathString <- Gtk.treePathToString path
+        -- TODO: unsafe(ish)
+        let jointId = jointIterLookup ! pathString
+        runEventHandler $ EV.selectJoint jointId
+        Gtk.widgetQueueDraw canvas
 
     -- Event handling for drawing area
     _ <- Gtk.onWidgetScrollEvent canvas $ \ev -> do
@@ -102,8 +157,9 @@ buildUi stateRef = do
 
     _ <- Gtk.onWidgetButtonReleaseEvent canvas $ \ev -> do
         btn <- fromIntegral <$> Gdk.getEventButtonButton ev
-        when (btn == Gdk.BUTTON_PRIMARY) $
+        when (btn == Gdk.BUTTON_PRIMARY) $ do
             runEventHandler $ EV.canvasPrimaryMouseButtonRelease ev
+            updateJointList
         Gtk.widgetQueueDraw canvas
         return True
 
@@ -125,6 +181,14 @@ buildUi stateRef = do
         when (key == Gdk.KEY_space) $ playbackHandler stateRef canvas btnPlayback
 
         Gtk.widgetQueueDraw canvas
+        return False -- Keyboard events need to be handled on some of the children too
+
+    _ <- Gtk.onWidgetKeyReleaseEvent window  $ \_ -> do
+        {- Update joint list on UI after every keypress, unless a cell value
+           is currently being edited - we don't want to get in the middle of that.
+        -}
+        isCellEditing <- ST.isCellEditActive <$> readIORef stateRef
+        unless isCellEditing updateJointList
         return True
 
     _ <- Gtk.onWidgetMotionNotifyEvent canvas $ \ev -> do
@@ -134,12 +198,17 @@ buildUi stateRef = do
 
     -- Menu item actions
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    _ <- Gtk.onMenuItemActivate fileSaveAs $ catch (runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar)
-                                             handleIOException
-    _ <- Gtk.onMenuItemActivate fileSave $ catch (runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar)
-                                           handleIOException
-    _ <- Gtk.onMenuItemActivate fileOpen $ catch (runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar >> Gtk.widgetQueueDraw canvas)
-                                           handleIOException
+    _ <- Gtk.onMenuItemActivate fileSaveAs $ catch
+                                            (runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar)
+                                            handleIOException
+    _ <- Gtk.onMenuItemActivate fileSave $ catch
+                                            (runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar)
+                                            handleIOException
+    _ <- Gtk.onMenuItemActivate fileOpen $ catch
+                                            (runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar >>
+                                            Gtk.widgetQueueDraw canvas >>
+                                            updateJointList)
+                                            handleIOException
 
     -- View local coordinate [0,0] at center of the canvas
     _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do
@@ -149,6 +218,7 @@ buildUi stateRef = do
         return ()
 
     Gtk.widgetShowAll window
+    updateJointList
 
 handleIOException :: IOException -> IO ()
 handleIOException = print
@@ -173,7 +243,6 @@ playbackHandler stateRef canvas btnPlayback = do
         Idle -> do
             Gtk.buttonSetLabel btnPlayback "Stop"
             tickCallbackId <- Gtk.widgetAddTickCallback canvas (\ _ frameClock -> do
-                -- Gdk.frameClockGetFrameTime frameClock >>= runEventHandler . EV.playbackTick
                 timestamp <- Gdk.frameClockGetFrameTime frameClock
                 needsRedraw <- runEventHandler $ EV.playbackTick timestamp
                 when needsRedraw $ Gtk.widgetQueueDraw canvas

@@ -16,6 +16,7 @@ mkJointAt jointId x y = Joint
     , J.jointLocalRot = 0
     , J.jointWorldRot = 0
     , J.jointR = 0
+    , J.jointName = Nothing
     }
 
 

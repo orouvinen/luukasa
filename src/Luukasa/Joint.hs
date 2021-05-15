@@ -3,6 +3,7 @@ module Luukasa.Joint where
 
 import           Calc         (angle, distance, rotd)
 import           Data.Aeson   (FromJSON, ToJSON)
+import           Data.Text    (Text)
 import           GHC.Generics (Generic)
 import           Units        (Degrees, getDegrees, getRadians, rad)
 
@@ -20,6 +21,7 @@ data JointLockMode
 
 data Joint = Joint
     { jointId       :: JointId
+    , jointName     :: Maybe Text
     , jointX        :: Double
     , jointY        :: Double
     , jointLocalRot :: Degrees -- ^ Rotation around parent joint
