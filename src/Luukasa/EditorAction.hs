@@ -23,6 +23,8 @@ data Action
     | MoveSelected Double Double
     | ExtendSelectionRect Double Double
     | DragRotateSelected Double Double
+    | AlignSelectedRadiusesToMin
+    | AlignSelectedRadiusesToMax
     -- Animation
     | CreateFrame
     | DeleteFrame
@@ -34,16 +36,18 @@ type ActionResult = Either ErrorMessage ST.AppState
 dispatchAction :: ST.AppState -> Action -> ActionResult
 dispatchAction s e =
     case e of
-        CreateJoint x y          -> createJoint s x y
-        DeleteSelected           -> deleteSelectedJoints s
-        TrySelect x y selectMode -> trySelect s x y selectMode
-        RotateSelected deg       -> rotateSelected s deg
-        MoveSelected x y         -> moveSelected s x y
-        ExtendSelectionRect x y  -> Right s
-        DragRotateSelected x y   -> rotateSelectedTowards s x y
-        CreateFrame              -> createFrame s
-        DeleteFrame              -> deleteFrame s
-        FrameStep n              -> frameStep s n
+        CreateJoint x y            -> createJoint s x y
+        DeleteSelected             -> deleteSelectedJoints s
+        TrySelect x y selectMode   -> trySelect s x y selectMode
+        RotateSelected deg         -> rotateSelected s deg
+        MoveSelected x y           -> moveSelected s x y
+        ExtendSelectionRect x y    -> Right s
+        DragRotateSelected x y     -> rotateSelectedTowards s x y
+        CreateFrame                -> createFrame s
+        DeleteFrame                -> deleteFrame s
+        FrameStep n                -> frameStep s n
+        AlignSelectedRadiusesToMin -> alignSelectedRadiuses s minimum
+        AlignSelectedRadiusesToMax -> alignSelectedRadiuses s maximum
 
 createJoint :: ST.AppState -> Int -> Int -> ActionResult
 createJoint s x y =
@@ -131,4 +135,12 @@ deleteFrame s = Right s { ST.animation = A.deleteCurrentFrame (ST.animation s)}
 frameStep :: ST.AppState -> Int -> ActionResult
 frameStep s n = Right s { ST.animation = A.frameStep (ST.animation s) n }
 
-
+alignSelectedRadiuses :: ST.AppState -> ([Double] -> Double) -> ActionResult
+alignSelectedRadiuses s selectRadius =
+    let animation = ST.animation s
+        body = A.currentFrameData animation
+        selectedJoints = ST.selectedNonRootJoints s
+        minRadius = selectRadius (J.jointR <$> selectedJoints)
+        replaceActions = [B.setJointRadius minRadius j | j <- selectedJoints]
+        body' = foldl' (&) body replaceActions
+    in Right s { ST.animation = A.setCurrentFrameData animation body' }

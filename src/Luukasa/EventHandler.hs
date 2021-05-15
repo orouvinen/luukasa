@@ -12,6 +12,7 @@ import           Control.Monad.State    (MonadState, get, gets, modify, put)
 import           Data.Aeson             (decode, encode)
 import qualified Data.ByteString.Lazy   as BS (readFile, writeFile)
 import           Data.Foldable          (forM_)
+import           Data.Function          ((&))
 import           Data.GI.Base           (AttrOp ((:=)), new)
 import           Data.Maybe             (fromJust)
 import           Data.Text              (Text, pack, unpack)
@@ -157,6 +158,16 @@ canvasMouseMotion e = do
 
         let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
         updateAppState result
+
+alignRadiusesToMin :: MonadState AppState m => m ()
+alignRadiusesToMin = do
+    appState <- get
+    E.dispatchAction appState E.AlignSelectedRadiusesToMin & updateAppState
+
+alignRadiusesToMax :: MonadState AppState m => m ()
+alignRadiusesToMax = do
+    appState <- get
+    E.dispatchAction appState E.AlignSelectedRadiusesToMax & updateAppState
 
 setViewScale :: MonadState AppState m => Double -> m ()
 setViewScale scaleFactor = modify (\s -> s { viewScale = scaleFactor })

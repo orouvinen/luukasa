@@ -9,9 +9,11 @@ module Luukasa.Body
     , limbSegments
     , getParentUnsafe
     , rootJointId
-    , rotateJoint
     , rotateJointTowards
+    , rotateJoint
+    , setJointRadius
     , addJoint
+    , replaceJoint
     , setJointPosition
     , createJoint)
     where
@@ -121,6 +123,18 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
             in  T.setChildren node children
 
 
+setJointRadius :: Double -> Joint -> Body -> Body
+setJointRadius r joint body =
+    let j = joint { J.jointR = r }
+        mbParent = getParent body (J.jointId j)
+    in case mbParent of
+        Nothing -> body
+        Just parent ->
+            let (x, y) = J.radiusPosition parent j
+            in replaceJoint j (j { J.jointX = x, J.jointY = y }) body
+
+
+
 setJointPosition :: Double -> Double -> Joint -> Body -> Body
 setJointPosition x y joint body =
     let parent = getParentUnsafe body (J.jointId joint)
@@ -152,6 +166,10 @@ addJoint body parent joint = body
     { root = T.insert joint (\j -> J.jointId j == J.jointId parent) (root body)
     , parentLookup = Map.insert (J.jointId joint) (J.jointId parent) (parentLookup body)
     }
+
+replaceJoint :: Joint -> Joint -> Body -> Body
+replaceJoint old new body  =
+    body { root = T.replaceVal old new (root body)}
 
 getParentUnsafe :: Body -> JointId -> Joint
 getParentUnsafe body jointId =
@@ -235,6 +253,9 @@ parentLookupUpdateForInherit :: [J.JointId] -> J.JointId -> ParentLookup -> Pare
 parentLookupUpdateForInherit childIds newParentId parentLookup' =
     foldl' (\m childId -> Map.adjust (const newParentId) childId m)
     parentLookup' childIds
+
+getParent :: Body -> JointId -> Maybe Joint
+getParent b childId = Map.lookup childId (parentLookup b) >>= getJointById b
 
 updateChildGeometry :: Body -> J.JointId -> J.JointId -> Body
 updateChildGeometry body parentId childId =

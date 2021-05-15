@@ -60,3 +60,9 @@ rotate deg parent rotatee =
         y = jointY parent + (jointR rotatee * sin (getRadians . rad $ worldRot))
     in
         rotatee { jointX = x, jointY = y, jointLocalRot = localRot, jointWorldRot = worldRot }
+
+radiusPosition :: Joint -> Joint -> (Double, Double)
+radiusPosition parent child = (x, y)
+  where
+    x = jointX parent + (jointR child * cos (getRadians . rad $ jointWorldRot child))
+    y = jointY parent + (jointR child * sin (getRadians . rad $ jointWorldRot child))

@@ -87,6 +87,10 @@ buildUi stateRef = do
     radioLockModeDrag <- GO.builderGetObject builder "radioLockModeDrag" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
     radioLockModeRotate <- GO.builderGetObject builder "radioLockModeRotate" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
 
+    -- Radius align buttons
+    btnAlignRadiusMin <- GO.builderGetObject builder "btnAlignRadiusMin" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
+    btnAlignRadiusMax <- GO.builderGetObject builder "btnAlignRadiusMax" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
+
     -- Bottom grid items
     statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
     Gtk.labelSetText statusBar "Luukasa started"
@@ -101,6 +105,9 @@ buildUi stateRef = do
     _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Luukasa.Joint.NoLock
     _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Drag
     _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Rotate
+
+    _ <- Gtk.onButtonClicked btnAlignRadiusMin $ runEventHandler EV.alignRadiusesToMin >> Gtk.widgetQueueDraw canvas
+    _ <- Gtk.onButtonClicked btnAlignRadiusMax $ runEventHandler EV.alignRadiusesToMax >> Gtk.widgetQueueDraw canvas
 
     _ <- Gtk.onButtonClicked btnPlayback $ playbackHandler stateRef canvas btnPlayback
 
@@ -122,14 +129,12 @@ buildUi stateRef = do
         return True
 
     _ <- Gtk.onWidgetButtonReleaseEvent canvas $ \ev -> do
-        button <- fromIntegral <$> Gdk.getEventButtonButton ev
-
-        case button of
-            Gdk.BUTTON_PRIMARY -> runEventHandler $ EV.canvasPrimaryMouseButtonRelease ev
-            _                  -> return ()
-
+        btn <- fromIntegral <$> Gdk.getEventButtonButton ev
+        when (btn == Gdk.BUTTON_PRIMARY) $
+            runEventHandler $ EV.canvasPrimaryMouseButtonRelease ev
         Gtk.widgetQueueDraw canvas
         return True
+
     {- KeyEvent handler directly on `window`:
 
     " To receive mouse events on a drawing area, you will need to enable them with Widget.addEvents.
