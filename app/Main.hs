@@ -9,6 +9,7 @@ import qualified GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
 import qualified GI.Gtk.Objects            as GO
 
+import           Control.Exception         (IOException, catch)
 import           Control.Monad             (when, (>=>))
 import           Control.Monad.IO.Class    (MonadIO (liftIO))
 import           Control.Monad.Reader      (MonadReader, ReaderT, ask,
@@ -156,9 +157,12 @@ buildUi stateRef = do
 
     -- Menu item actions
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
-    _ <- Gtk.onMenuItemActivate fileSaveAs $ runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar
-    _ <- Gtk.onMenuItemActivate fileSave $ runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar
-    _ <- Gtk.onMenuItemActivate fileOpen $ runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar >> Gtk.widgetQueueDraw canvas
+    _ <- Gtk.onMenuItemActivate fileSaveAs $ catch (runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar)
+                                             handleIOException
+    _ <- Gtk.onMenuItemActivate fileSave $ catch (runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar)
+                                           handleIOException
+    _ <- Gtk.onMenuItemActivate fileOpen $ catch (runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar >> Gtk.widgetQueueDraw canvas)
+                                           handleIOException
 
     -- View local coordinate [0,0] at center of the canvas
     _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do
@@ -168,6 +172,9 @@ buildUi stateRef = do
         return ()
 
     Gtk.widgetShowAll window
+
+handleIOException :: IOException -> IO ()
+handleIOException = print
 
 showFileResult :: T.Text -> Gtk.Label -> Maybe T.Text -> IO ()
 showFileResult _ _ Nothing = return ()
