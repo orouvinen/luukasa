@@ -31,6 +31,11 @@ import           Luukasa.Joint          (JointLockMode (..))
 
 type EventResult a = Either ErrorMessage a
 
+jointDragLockModifier, selectToggleModifier :: Gdk.ModifierType
+jointDragLockModifier = Gdk.ModifierTypeShiftMask
+selectToggleModifier = Gdk.ModifierTypeControlMask
+
+
 toEventResult :: Monad m => ActionResult -> a -> m (EventResult a)
 toEventResult res retval =
     return $ case res of
@@ -53,12 +58,12 @@ canvasPrimaryMouseButtonClick e = do
     let x = truncate x'
         y = truncate y'
 
-    ctrlPressed <- elem Gdk.ModifierTypeControlMask <$> clickModifiers e
+    toggleSelect <- elem selectToggleModifier <$> clickModifiers e
 
     let dispatch = dispatchAction appState
         result = case actionState appState of
             PlacingNewJoint -> dispatch $ E.CreateJoint x y
-            Idle            -> dispatch $ E.TrySelect x y (if ctrlPressed then Toggle else Set)
+            Idle            -> dispatch $ E.TrySelect x y (if toggleSelect then Toggle else Set)
             _               -> Right appState
 
     updateAppState result
@@ -137,14 +142,14 @@ canvasMouseMotion e = do
     appState <- get
 
     mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
-    ctrlPressed <- elem Gdk.ModifierTypeControlMask <$> motionModifiers e
+    toggleDragMode <- elem jointDragLockModifier <$> motionModifiers e
 
     when (mouseBtnPressed && selectionSize appState == 1) $ do
         (mouseX, mouseY) <- motionPos e
         let dragState =
                 if selectionSize appState == 0
                     then DragSelectionRect
-                    else DragSelected $ if ctrlPressed then toggledDragMode else defaultDragMode
+                    else DragSelected $ if toggleDragMode then toggledDragMode else defaultDragMode
                         where
                         defaultDragMode = dragMode appState
                         toggledDragMode = case defaultDragMode of
