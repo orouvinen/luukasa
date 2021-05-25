@@ -1,56 +1,29 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
-import           Data.IORef                (IORef, newIORef, readIORef,
-                                            writeIORef)
+import           Data.IORef                (IORef, newIORef, readIORef)
 import           GI.Cairo.Render.Connector (renderWithContext)
 import qualified GI.Gdk                    as Gdk
 import qualified GI.Gtk                    as Gtk
 import qualified GI.Gtk.Objects            as GO
 
 import           Control.Exception         (IOException, catch)
-import           Control.Monad             (when, (>=>))
-import           Control.Monad.IO.Class    (MonadIO (liftIO))
-import           Control.Monad.Reader      (MonadReader, ReaderT, ask,
-                                            runReaderT)
-import           Control.Monad.State       (MonadState, get, put)
+import           Control.Monad             (when)
 import           Data.Maybe                (fromJust)
 import qualified Data.Text                 as T
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             actionState, initialState)
 import           Luukasa.Common            (ErrorMessage)
-import           Luukasa.Event.Keyboard
-import           Luukasa.Event.Mouse       (HasMouseEvent, clickModifiers,
-                                            clickPos, getScrollDirection,
-                                            motionModifiers, motionPos)
+import           Luukasa.Event.EventM
 import qualified Luukasa.EventHandler      as EV
 import qualified Luukasa.Joint
 import qualified Luukasa.Render            as Render (render)
-
-newtype EventM a = EventM { runEventM :: ReaderT (IORef AppState) IO a }
-    deriving (Functor, Applicative, Monad, MonadReader (IORef AppState), MonadIO)
-
-instance MonadState AppState EventM where
-    get = ask >>= liftIO . readIORef
-    put s = ask >>= \stateRef -> liftIO $ writeIORef stateRef s
-instance HasKeyEvent EventM where
-    getKey = Gdk.getEventKeyKeyval >=> Gdk.keyvalToUpper
-instance HasMouseEvent EventM where
-    getScrollDirection = Gdk.getEventScrollDirection
-    clickPos e = (,) <$> Gdk.getEventButtonX e <*> Gdk.getEventButtonY e
-    motionPos e = (,) <$> Gdk.getEventMotionX e <*> Gdk.getEventMotionY e
-    clickModifiers = Gdk.getEventButtonState
-    motionModifiers = Gdk.getEventMotionState
 
 main :: IO ()
 main = do
     _ <- Gtk.init Nothing
     newIORef initialState >>= buildUi
     Gtk.main
-
-runEvent :: IORef AppState -> EventM a -> IO a
-runEvent stateRef handler = runReaderT (runEventM handler) stateRef
 
 runEventWithResult
     :: IORef AppState
@@ -62,7 +35,6 @@ runEventWithResult stateRef onError eventHandler = do
     case result of
         Left err -> onError err
         Right _  -> return ()
-
     return result
 
 buildUi :: IORef AppState -> IO ()
