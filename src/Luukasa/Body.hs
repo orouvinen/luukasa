@@ -69,8 +69,8 @@ create =
         , parentLookup = Map.empty
         }
 
-rotateJointTowards :: JointLockMode -> Double -> Double -> Joint -> Body -> Body
-rotateJointTowards lockMode x y joint body =
+rotateJointTowards :: Double -> Double -> JointLockMode -> Joint -> Body -> Body
+rotateJointTowards x y lockMode joint body =
     let parent = getParentUnsafe body (J.jointId joint)
         a1 = angle (J.jointX parent) (J.jointY parent) (J.jointX joint) (J.jointY joint)
         a2 = angle (J.jointX parent) (J.jointY parent) x y

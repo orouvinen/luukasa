@@ -86,26 +86,17 @@ trySelect s x y selectMode =
             in Right s { ST.selectedJointIds = selectedJointIds }
 
 rotateSelected :: ST.AppState -> Double -> ActionResult
-rotateSelected s deg =
-    let animation = ST.animation s
-        body = A.currentFrameData animation
-        rotatees = ST.selectedNonRootJoints s
-        rotateActions = [B.rotateJoint (ST.jointLockMode s) deg j | j <- rotatees]
-        body' = foldl' (&) body rotateActions
-    in Right s { ST.animation = A.setCurrentFrameData animation body' }
+rotateSelected s deg = Right
+    $ withCurrentFrameSelectedJoints s
+    $ B.rotateJoint (ST.jointLockMode s) deg
 
 rotateSelectedTowards :: ST.AppState -> Double -> Double -> ActionResult
 rotateSelectedTowards s x y =
-    let animation = ST.animation s
-        body = A.currentFrameData animation
-        (translateX, translateY) = (ST.translateX s, ST.translateY s)
+    let (translateX, translateY) = (ST.translateX s, ST.translateY s)
         (localX, localY) = screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
-
-        rotatees = ST.selectedNonRootJoints s
-        rotateActions = [B.rotateJointTowards (ST.jointLockMode s) localX localY j | j <- rotatees]
-        body' = foldl' (&) body rotateActions
-    in Right s { ST.animation = A.setCurrentFrameData animation body' }
-
+    in Right
+        $ withCurrentFrameSelectedJoints s
+        $ B.rotateJointTowards localX localY (ST.jointLockMode s)
 
 moveSelected :: ST.AppState -> Double -> Double -> ActionResult
 moveSelected s x y =
@@ -137,10 +128,25 @@ frameStep s n = Right s { ST.animation = A.frameStep (ST.animation s) n }
 
 levelSelectedRadiuses :: ST.AppState -> ([Double] -> Double) -> ActionResult
 levelSelectedRadiuses s selectRadius =
-    let animation = ST.animation s
+    let radius = selectRadius (J.jointR <$> ST.selectedNonRootJoints s)
+    in Right
+        $ withCurrentFrameSelectedJoints s
+        $ B.setJointRadius radius
+
+
+{- |
+    withCurrentFrameSelectedJoints applies a function `f` to all selected joints in the current frame.
+    `f` is is given a joint and the body it belongs to, and should return new body with the modified joint.
+
+    Finally a new AppState with the modified frame data (body) is returned.
+-}
+withCurrentFrameSelectedJoints :: ST.AppState -> (J.Joint -> B.Body -> B.Body) -> ST.AppState
+withCurrentFrameSelectedJoints st f =
+    let animation = ST.animation st
+        js = ST.selectedNonRootJoints st
         body = A.currentFrameData animation
-        selectedJoints = ST.selectedNonRootJoints s
-        radius = selectRadius (J.jointR <$> selectedJoints)
-        setRadiusActions = [B.setJointRadius radius j | j <- selectedJoints]
-        body' = foldl' (&) body setRadiusActions
-    in Right s { ST.animation = A.setCurrentFrameData animation body' }
+        actions = [f j | j <- js]
+        body' = foldl' (&) body actions
+    in st { ST.animation = A.setCurrentFrameData animation body' }
+
+
