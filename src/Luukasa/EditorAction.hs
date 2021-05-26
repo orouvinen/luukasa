@@ -23,8 +23,8 @@ data Action
     | MoveSelected Double Double
     | ExtendSelectionRect Double Double
     | DragRotateSelected Double Double
-    | AlignSelectedRadiusesToMin
-    | AlignSelectedRadiusesToMax
+    | LevelSelectedRadiusesToMin
+    | LevelSelectedRadiusesToMax
     -- Animation
     | CreateFrame
     | DeleteFrame
@@ -46,8 +46,8 @@ dispatchAction s e =
         CreateFrame                -> createFrame s
         DeleteFrame                -> deleteFrame s
         FrameStep n                -> frameStep s n
-        AlignSelectedRadiusesToMin -> alignSelectedRadiuses s minimum
-        AlignSelectedRadiusesToMax -> alignSelectedRadiuses s maximum
+        LevelSelectedRadiusesToMin -> levelSelectedRadiuses s minimum
+        LevelSelectedRadiusesToMax -> levelSelectedRadiuses s maximum
 
 createJoint :: ST.AppState -> Int -> Int -> ActionResult
 createJoint s x y =
@@ -135,8 +135,8 @@ deleteFrame s = Right s { ST.animation = A.deleteCurrentFrame (ST.animation s)}
 frameStep :: ST.AppState -> Int -> ActionResult
 frameStep s n = Right s { ST.animation = A.frameStep (ST.animation s) n }
 
-alignSelectedRadiuses :: ST.AppState -> ([Double] -> Double) -> ActionResult
-alignSelectedRadiuses s selectRadius =
+levelSelectedRadiuses :: ST.AppState -> ([Double] -> Double) -> ActionResult
+levelSelectedRadiuses s selectRadius =
     let animation = ST.animation s
         body = A.currentFrameData animation
         selectedJoints = ST.selectedNonRootJoints s

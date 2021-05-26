@@ -167,12 +167,12 @@ canvasMouseMotion e = do
 alignRadiusesToMin :: MonadState AppState m => m ()
 alignRadiusesToMin = do
     appState <- get
-    E.dispatchAction appState E.AlignSelectedRadiusesToMin & updateAppState
+    E.dispatchAction appState E.LevelSelectedRadiusesToMin & updateAppState
 
 alignRadiusesToMax :: MonadState AppState m => m ()
 alignRadiusesToMax = do
     appState <- get
-    E.dispatchAction appState E.AlignSelectedRadiusesToMax & updateAppState
+    E.dispatchAction appState E.LevelSelectedRadiusesToMax & updateAppState
 
 setViewScale :: MonadState AppState m => Double -> m ()
 setViewScale scaleFactor = modify (\s -> s { viewScale = scaleFactor })
