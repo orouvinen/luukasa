@@ -65,17 +65,15 @@ setVal node x = node { _val = x }
 setChildren :: Tree a -> [Tree a] -> Tree a
 setChildren node xs = node { _children = xs }
 
--- This is inefficient.
--- TODO: just replace the values one by one. The hosting
--- nodes needn't be guaranteed to stay the same.
-setChildValues :: Eq a => Tree a -> [a] -> Tree a
+
+setChildValues :: Tree a -> [a] -> Tree a
 setChildValues node xs =
-    let children' = foldl' (\ns n ->
-            let matchingChild = find (== _val n) xs
-            in case matchingChild of
-                Nothing -> ns
-                Just x  -> n { _val = x } : ns)
-            [] (_children node)
+    let children' = foldl' (\nodes nvp ->
+            let hostingNode = fst nvp
+                newValue    = snd nvp
+            in hostingNode { _val = newValue } : nodes)
+                []
+                (zip (children node) xs)
     in node { _children = children' }
 
 
