@@ -11,7 +11,7 @@ import           Luukasa.Animation (Animation)
 import qualified Luukasa.Animation as A
 import           Luukasa.Body      (Body)
 import qualified Luukasa.Body      as B
-import           Luukasa.Common
+import           Luukasa.Common    (TimerCallbackId, TimestampUs)
 import           Luukasa.Joint     (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint     as J
 import qualified Tree              as T
@@ -57,7 +57,7 @@ initialState = AppState
     , viewScale = 1
     , translateX = 0
     , translateY = 0
-    , jointLockMode = NoLock
+    , jointLockMode = LockNone
     , dragMode = DragRotate
     , frameStart = Nothing
     , currentFileName = Nothing

@@ -9,7 +9,7 @@ import qualified Luukasa.JointSelect    as Sel
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader   (ReaderT, ask, asks, lift, runReaderT)
 import           Data.Foldable          (toList)
-import           Data.IORef
+import           Data.IORef             (IORef, readIORef)
 
 import           GI.Cairo.Render        (Render)
 import qualified GI.Cairo.Render        as CR hiding (x, y)

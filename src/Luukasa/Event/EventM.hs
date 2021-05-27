@@ -2,9 +2,9 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 module Luukasa.Event.EventM where
 
-import           Luukasa.AppState
-import           Luukasa.Event.Keyboard
-import           Luukasa.Event.Mouse
+import           Luukasa.AppState       (AppState)
+import           Luukasa.Event.Keyboard (HasKeyEvent (..))
+import           Luukasa.Event.Mouse    (HasMouseEvent (..))
 
 import           Control.Monad          ((>=>))
 import           Control.Monad.IO.Class (MonadIO (liftIO))

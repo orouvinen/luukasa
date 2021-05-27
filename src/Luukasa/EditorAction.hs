@@ -138,7 +138,7 @@ levelSelectedRadiuses s selectRadius =
     withCurrentFrameSelectedJoints applies a function `f` to all selected joints in the current frame.
     `f` is is given a joint and the body it belongs to, and should return new body with the modified joint.
 
-    Finally a new AppState with the modified frame data (body) is returned.
+    New AppState with the modified frame data (body) is returned.
 -}
 withCurrentFrameSelectedJoints :: ST.AppState -> (J.Joint -> B.Body -> B.Body) -> ST.AppState
 withCurrentFrameSelectedJoints st f =

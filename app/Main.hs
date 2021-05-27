@@ -14,9 +14,9 @@ import qualified Data.Text                 as T
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             actionState, initialState)
 import           Luukasa.Common            (ErrorMessage)
-import           Luukasa.Event.EventM
+import           Luukasa.Event.EventM      (EventM, runEvent)
 import qualified Luukasa.EventHandler      as EV
-import qualified Luukasa.Joint
+import qualified Luukasa.Joint             as Joint
 import qualified Luukasa.Render            as Render (render)
 
 main :: IO ()
@@ -74,9 +74,9 @@ buildUi stateRef = do
     -- Event handlers
     _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
 
-    _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Luukasa.Joint.NoLock
-    _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Drag
-    _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Luukasa.Joint.Rotate
+    _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode Joint.LockNone
+    _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode Joint.LockDrag
+    _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode Joint.LockRotate
 
     _ <- Gtk.onButtonClicked btnAlignRadiusMin $ runEventHandler EV.alignRadiusesToMin >> Gtk.widgetQueueDraw canvas
     _ <- Gtk.onButtonClicked btnAlignRadiusMax $ runEventHandler EV.alignRadiusesToMax >> Gtk.widgetQueueDraw canvas

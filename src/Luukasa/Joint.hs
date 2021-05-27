@@ -2,19 +2,19 @@
 module Luukasa.Joint where
 
 import           Calc         (angle, distance, rotd)
-import           Data.Aeson
-import           GHC.Generics
+import           Data.Aeson   (FromJSON, ToJSON)
+import           GHC.Generics (Generic)
 import           Units        (Degrees, getDegrees, getRadians, rad)
 
 type JointId = Int
 
 data JointLockMode
     -- Child joints will stay where they are
-    = NoLock
+    = LockNone
     -- Children's distance to the rotated joint will be kept, but no rotation is applied to the children
-    | Drag
+    | LockDrag
     -- Children rotate with the rotated joint (around the common parent)
-    | Rotate
+    | LockRotate
     deriving Show
 
 

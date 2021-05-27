@@ -21,7 +21,7 @@ module Luukasa.Animation
     , deleteCurrentFrame
     ) where
 
-import           Data.Aeson
+import           Data.Aeson    (FromJSON, ToJSON)
 import           Data.Foldable (toList)
 import           Data.Sequence (Seq, (<|), (|>))
 import qualified Data.Sequence as Seq
@@ -71,10 +71,10 @@ instance Show TimeCode where
             | otherwise = "0" ++ show x
 
 mkAnimation :: Int -> Animation a
-mkAnimation fps = Animation
+mkAnimation animationFps = Animation
     { _frames = Seq.Empty
     , _currentFrame = 0
-    , _fps = fps
+    , _fps = animationFps
     }
 
 fps :: Animation a -> Int
@@ -84,14 +84,14 @@ currentFrameNum :: Animation a -> FrameNum
 currentFrameNum = FrameNum . _currentFrame
 
 frameTimeCode :: Int -> FrameNum -> TimeCode
-frameTimeCode fps (FrameNum num) =
-    let totalSeconds = num `div` fps
+frameTimeCode animationFps (FrameNum num) =
+    let totalSeconds = num `div` animationFps
         totalMinutes = totalSeconds `div` 60
 
         hours' = totalMinutes `div` 60
         minutes' = totalMinutes `mod` 60
         seconds' = totalSeconds `mod` 60
-        frame' = (num `mod` fps) + 1
+        frame' = (num `mod` animationFps) + 1
     in TimeCode hours' minutes' seconds' frame'
 
 currentTimeCode :: Animation a -> String

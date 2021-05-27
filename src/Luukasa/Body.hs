@@ -5,15 +5,14 @@ module Luukasa.Body
     , create
     , deleteJoint
     , isRoot
+    , getParentUnsafe
     , jointPositions
     , limbSegments
-    , getParentUnsafe
     , rootJointId
     , rotateJointTowards
     , rotateJoint
     , setJointRadius
     , addJoint
-    , replaceJoint
     , setJointPosition
     , createJoint)
     where
@@ -105,15 +104,15 @@ rotateAdjustChild lockMode dx dy deg parentNode jointNode =
         joint = T.val jointNode
         (jx, jy) = (J.jointX joint, J.jointY joint)
     in case lockMode of
-        NoLock -> T.setVal jointNode (J.setChildAngleAndRadius parent joint)
+        LockNone -> T.setVal jointNode (J.setChildAngleAndRadius parent joint)
 
-        Drag ->
+        LockDrag ->
             let node = T.setVal jointNode (joint { J.jointX = jx + dx, J.jointY = jy + dy })
                 children =
                     rotateAdjustChild lockMode dx dy deg jointNode <$> T.children jointNode
             in T.setChildren node children
 
-        Rotate ->
+        LockRotate ->
             -- Follow parent's rotation but restore local rotation as it has not changed
             let originalLocalRot = J.jointLocalRot joint
                 joint' = J.rotate deg parent joint
@@ -221,15 +220,12 @@ createJoint parentJointId jointId x y body =
     in addJoint body parent newJoint
 
 {-
-    Joint deletion is slightly convoluted (and not any less so because of my
-    expressive abilites in the language, which I feel are lacking)
-    because the function needs to:
+    Joint deletion is slightly involved.
+    When deleting a joint, we need to:
         1. delete the given joint
         2. update parent lookup table
-        3. update delete joint's children to maintain their
-           geometric relation to the parent, which has now changed.
-
-    In short - it isn't pretty.
+        3. update deleted joint's children's geometric relation to their parent,
+           which has now changed.
 -}
 deleteJoint :: J.JointId -> Body -> Body
 deleteJoint jointId body =

@@ -11,7 +11,7 @@ module Units
     , getRadians
     ) where
 
-import           Data.Aeson
+import           Data.Aeson (FromJSON, ToJSON)
 import           Data.Fixed (mod')
 
 newtype Radians = Radians { getRadians :: Double } deriving (Show, Num, Ord, Eq)

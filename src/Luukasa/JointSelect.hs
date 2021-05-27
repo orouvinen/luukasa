@@ -8,7 +8,7 @@ module Luukasa.JointSelect
     , isSelected)
     where
 
-import           Calc
+import           Calc          (distance)
 import           Data.Foldable (toList)
 import qualified Luukasa.Body  as B
 import qualified Luukasa.Joint as J

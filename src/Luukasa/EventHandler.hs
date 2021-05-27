@@ -18,16 +18,20 @@ import           Data.Maybe             (fromJust)
 import           Data.Text              (Text, pack, unpack)
 import qualified GI.Gdk                 as Gdk
 import qualified GI.Gtk                 as Gtk
-import           Luukasa.Animation
-import           Luukasa.AppState       as ST
-import           Luukasa.Common
+import qualified Luukasa.Animation      as Animation
+import           Luukasa.AppState       (ActionState (..), AppState,
+                                         DragMode (..), DragState (..))
+import qualified Luukasa.AppState       as ST
+import           Luukasa.Common         (ErrorMessage, TimerCallbackId,
+                                         TimestampUs)
 import           Luukasa.EditorAction   as E (Action (..), ActionResult,
                                               SelectMode (..), dispatchAction)
-import           Luukasa.Event.Keyboard
+import           Luukasa.Event.Keyboard (HasKeyEvent (..))
 import           Luukasa.Event.Mouse    (HasMouseEvent, clickModifiers,
                                          clickPos, getScrollDirection,
                                          motionModifiers, motionPos)
 import           Luukasa.Joint          (JointLockMode (..))
+
 
 type EventResult a = Either ErrorMessage a
 
@@ -48,7 +52,7 @@ updateAppState = \case
     Right newState -> put newState
 
 selectLockMode :: MonadState AppState m => JointLockMode -> m ()
-selectLockMode lockMode = modify (\s -> s { jointLockMode = lockMode })
+selectLockMode lockMode = modify (\s -> s { ST.jointLockMode = lockMode })
 
 canvasPrimaryMouseButtonClick :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonClick e = do
@@ -61,9 +65,9 @@ canvasPrimaryMouseButtonClick e = do
     toggleSelect <- elem selectToggleModifier <$> clickModifiers e
 
     let dispatch = dispatchAction appState
-        result = case actionState appState of
-            PlacingNewJoint -> dispatch $ E.CreateJoint x y
-            Idle            -> dispatch $ E.TrySelect x y (if toggleSelect then Toggle else Set)
+        result = case ST.actionState appState of
+            ST.PlacingNewJoint -> dispatch $ E.CreateJoint x y
+            ST.Idle            -> dispatch $ E.TrySelect x y (if toggleSelect then Toggle else Set)
             _               -> Right appState
 
     updateAppState result
@@ -72,21 +76,21 @@ canvasPrimaryMouseButtonClick e = do
 canvasPrimaryMouseButtonRelease :: MonadState AppState m => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonRelease _ = do
     s <- get
-    unless (isPlaybackOn s) $ put s { actionState = Idle }
+    unless (ST.isPlaybackOn s) $ put s { ST.actionState = Idle }
 
 startPlayback :: MonadState AppState m => TimerCallbackId -> TimestampUs -> m ()
 startPlayback timerCallbackId timestamp =
-    modify (\s -> s { actionState = AnimationPlayback timerCallbackId
-                    , frameStart = Just timestamp
+    modify (\s -> s { ST.actionState = AnimationPlayback timerCallbackId
+                    , ST.frameStart = Just timestamp
                     })
 
 stopPlayback :: MonadState AppState m => m ()
-stopPlayback = modify (\s -> s { actionState = Idle, frameStart = Nothing })
+stopPlayback = modify (\s -> s { ST.actionState = Idle, ST.frameStart = Nothing })
 
 playbackTick :: MonadState AppState m => TimestampUs -> m Bool
 playbackTick timestamp = do
     s <- get
-    let frameIntervalUs = (1.0 / (fromIntegral (fps $ animation s) :: Double)) * 1000 * 1000
+    let frameIntervalUs = (1.0 / (fromIntegral (Animation.fps $ ST.animation s) :: Double)) * 1000 * 1000
         lastFrame = fromJust (ST.frameStart s)
         sinceLastFrame = timestamp - lastFrame
         renderNeeded = fromIntegral sinceLastFrame >= frameIntervalUs
@@ -94,7 +98,7 @@ playbackTick timestamp = do
     when renderNeeded $ do
         -- timestamp might not be totally accurate for frameStart if
         -- this frame is delayed. Should probably set the originally intended frameStart?
-        let result = dispatchAction s { frameStart = Just timestamp } (E.FrameStep 1)
+        let result = dispatchAction s { ST.frameStart = Just timestamp } (E.FrameStep 1)
         updateAppState result
 
     return renderNeeded
@@ -108,8 +112,8 @@ canvasKeyPress eventKey = do
 
     let result = case key of
             Gdk.KEY_J       ->
-                if selectionSize s == 1 -- Parent joint needs to be selected
-                    then Right s { actionState = PlacingNewJoint }
+                if ST.selectionSize s == 1 -- Parent joint needs to be selected
+                    then Right s { ST.actionState = PlacingNewJoint }
                     else Left "Parent joint needs to be selected in order to create a joint"
             Gdk.KEY_Delete      -> dispatch E.DeleteSelected
             Gdk.KEY_Up          -> dispatch $ E.RotateSelected 2
@@ -135,7 +139,7 @@ canvasScrollWheel eventScroll = do
             then -scrollWheelScaleStep
             else scrollWheelScaleStep
 
-    modify (\s -> s { viewScale = viewScale s + scaleChange })
+    modify (\s -> s { ST.viewScale = ST.viewScale s + scaleChange })
 
 canvasMouseMotion :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventMotion -> m ()
 canvasMouseMotion e = do
@@ -144,14 +148,14 @@ canvasMouseMotion e = do
     mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
     toggleDragMode <- elem jointDragLockModifier <$> motionModifiers e
 
-    when (mouseBtnPressed && selectionSize appState == 1) $ do
+    when (mouseBtnPressed && ST.selectionSize appState == 1) $ do
         (mouseX, mouseY) <- motionPos e
         let dragState =
-                if selectionSize appState == 0
+                if ST.selectionSize appState == 0
                     then DragSelectionRect
                     else DragSelected $ if toggleDragMode then toggledDragMode else defaultDragMode
                         where
-                        defaultDragMode = dragMode appState
+                        defaultDragMode = ST.dragMode appState
                         toggledDragMode = case defaultDragMode of
                                                 DragMove   -> DragRotate
                                                 DragRotate -> DragMove
@@ -161,7 +165,7 @@ canvasMouseMotion e = do
                 DragSelected DragMove -> E.MoveSelected mouseX mouseY
                 DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
-        let result = E.dispatchAction appState { actionState = ST.Drag dragState } action
+        let result = E.dispatchAction appState { ST.actionState = Drag dragState } action
         updateAppState result
 
 alignRadiusesToMin :: MonadState AppState m => m ()
@@ -175,14 +179,14 @@ alignRadiusesToMax = do
     E.dispatchAction appState E.LevelSelectedRadiusesToMax & updateAppState
 
 setViewScale :: MonadState AppState m => Double -> m ()
-setViewScale scaleFactor = modify (\s -> s { viewScale = scaleFactor })
+setViewScale scaleFactor = modify (\s -> s { ST.viewScale = scaleFactor })
 
 setViewTranslate :: MonadState AppState m => Double -> Double -> m ()
-setViewTranslate trX trY = modify (\s -> s { translateX = trX, translateY = trY })
+setViewTranslate trX trY = modify (\s -> s { ST.translateX = trX, ST.translateY = trY })
 
 menuSave :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do
-    filename <- gets currentFileName
+    filename <- gets ST.currentFileName
     case filename of
         Nothing -> void $ menuSaveAs w
         Just f  -> writeAnimationToFile f
@@ -198,7 +202,7 @@ writeAnimationToFile :: (MonadState AppState m, MonadIO m) => Text -> m ()
 writeAnimationToFile filename = do
     json <- gets $ encode . ST.animation
     liftIO $ BS.writeFile (unpack filename) json
-    modify (\s -> s { currentFileName = Just filename })
+    modify (\s -> s { ST.currentFileName = Just filename })
 
 menuOpen :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuOpen w = do
@@ -208,7 +212,7 @@ menuOpen w = do
     join <$> forM filename (\f -> do
         json <- liftIO $ BS.readFile (unpack f)
         forM (decode json) (\a -> do
-            put state { ST.animation = a, currentFileName = Just f }
+            put state { ST.animation = a, ST.currentFileName = Just f }
             return f))
 
 

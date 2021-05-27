@@ -24,11 +24,11 @@ module Tree
     ) where
 
 
-import           Data.Aeson
+import           Data.Aeson    (FromJSON, ToJSON)
 import           Data.Foldable (foldl')
 import           Data.List     (find, intersperse)
 import           Data.Maybe    (catMaybes)
-import           GHC.Generics
+import           GHC.Generics  (Generic)
 
 data Tree a
     = Empty
