@@ -27,8 +27,8 @@ import qualified Luukasa.Joint as J
 import           Tree          (Tree)
 import qualified Tree          as T (children, create, delete, findNode,
                                      findNodeBy, insert, replaceNode,
-                                     replaceNodeBy, replaceVal, replaceValBy,
-                                     setChildValues, setChildren, setVal, val)
+                                     replaceVal, setChildValues, setChildren,
+                                     setVal, val)
 
 import           Calc          (angle)
 import           Data.Aeson    (FromJSON, ToJSON)
@@ -147,14 +147,9 @@ setJointPosition x y joint body =
 
         updatedChildren = J.setChildAngleAndRadius newJoint <$> (T.val <$> children)
         nodeWithUpdatedChildren = T.setChildValues jointNode updatedChildren
-        root' = T.replaceNodeBy (\n -> J.jointId (T.val n) == J.jointId joint) nodeWithUpdatedChildren (root body)
+        root' = T.replaceNode jointNode nodeWithUpdatedChildren (root body)
 
-    in body
-        { root = T.replaceValBy
-                    (\j -> J.jointId j == J.jointId joint)
-                    newJoint
-                    root'
-        }
+    in body { root = T.replaceVal joint newJoint root' }
 
 
 isRoot :: Joint -> Bool
