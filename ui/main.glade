@@ -16,9 +16,9 @@
     <columns>
       <!-- column-name colJointName -->
       <column type="gchararray"/>
-      <!-- column-name colJointX -->
+      <!-- column-name colJointRotMin -->
       <column type="gdouble"/>
-      <!-- column-name colJointY -->
+      <!-- column-name colJointRotMax -->
       <column type="gdouble"/>
     </columns>
   </object>
@@ -364,9 +364,9 @@
                 </child>
                 <child>
                   <object class="GtkTreeViewColumn">
-                    <property name="title" translatable="yes">X</property>
+                    <property name="title" translatable="yes">RLimMin</property>
                     <child>
-                      <object class="GtkCellRendererText" id="colJointX">
+                      <object class="GtkCellRendererText" id="colJointRotMin">
                         <property name="editable">True</property>
                       </object>
                       <attributes>
@@ -377,9 +377,9 @@
                 </child>
                 <child>
                   <object class="GtkTreeViewColumn">
-                    <property name="title" translatable="yes">Y</property>
+                    <property name="title" translatable="yes">RLimMax</property>
                     <child>
-                      <object class="GtkCellRendererText" id="colJointY">
+                      <object class="GtkCellRendererText" id="colJointRotMax">
                         <property name="editable">True</property>
                       </object>
                       <attributes>

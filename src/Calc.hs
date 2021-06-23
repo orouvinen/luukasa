@@ -1,13 +1,24 @@
 {-# LANGUAGE ViewPatterns #-}
-module Calc (rotd, distance, angle) where
+module Calc (rotd, distance, angle, rotdWithRange) where
 
-import           Data.Fixed (mod')
-import           Units      (Degrees, deg, getDegrees, mkDegrees, mkRadians)
+import           Data.Fixed   (mod')
+import           LimitedRange (LimitedRange)
+import qualified LimitedRange
+import           Units        (Degrees, deg, getDegrees, mkDegrees,
+                               mkDegreesUnlimited, mkRadians)
 
 rotd :: Degrees -> Double -> Degrees
 rotd (getDegrees -> x) delta = mkDegrees $ rotated $ x + delta
   where
     rotated degrees = mod' degrees 360
+
+rotdWithRange :: Degrees -> Double -> LimitedRange Degrees -> Degrees
+rotdWithRange degFrom@(getDegrees -> x) delta range =
+    case LimitedRange.getEffectiveRange range of
+        Just r -> LimitedRange.fitValue r attemptedRotation
+          where
+            attemptedRotation = mkDegreesUnlimited $ x + delta
+        Nothing -> rotd degFrom delta
 
 distance :: Double -> Double -> Double -> Double -> Double
 distance x y x' y' =

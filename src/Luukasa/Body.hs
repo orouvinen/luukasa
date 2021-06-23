@@ -38,6 +38,7 @@ import           Calc          (angle)
 import           Data.Aeson    (FromJSON, ToJSON)
 import           Data.Functor  ((<&>))
 import           GHC.Generics  (Generic)
+import           LimitedRange
 import qualified Units
 
 rootJointId :: JointId
@@ -65,6 +66,7 @@ create =
             , J.jointLocalRot = 0
             , J.jointWorldRot = 0
             , J.jointR = 0
+            , J.jointRotLim = mkRange 0 0
             }
     in Body
         { root = T.create rootJoint
@@ -226,6 +228,7 @@ createJoint parentJointId jointId x y body =
                     , J.jointId = jointId
                     , J.jointLocalRot = 0
                     , J.jointWorldRot = 0
+                    , J.jointRotLim = mkRange 0 0
                     , J.jointR = 0
                     })
     in addJoint body parent newJoint

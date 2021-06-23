@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4ac1ba5521ada62d50445a16905e1960565139f8683106fd07e45faf8177a8a6
+-- hash: 2cfbab4b06c8e8f25785f411ef0fb42525e7d20fc7ff8dbf55946b53e0594b94
 
 name:           luukasa
 version:        0.1.0.0
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Calc
+      LimitedRange
       Luukasa.Animation
       Luukasa.AppState
       Luukasa.Body

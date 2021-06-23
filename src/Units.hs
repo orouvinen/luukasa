@@ -5,6 +5,7 @@ module Units
     , Degrees
     , mkRadians
     , mkDegrees
+    , mkDegreesUnlimited
     , deg
     , getDegrees
     , rad
@@ -19,6 +20,10 @@ newtype Degrees = Degrees { getDegrees :: Double } deriving (Show, Num, Ord, Eq,
 
 mkDegrees :: Double -> Degrees
 mkDegrees d = Degrees $ mod' d 360
+
+-- TODO: make this go away:
+mkDegreesUnlimited :: Double -> Degrees
+mkDegreesUnlimited = Degrees
 
 mkRadians :: Double -> Radians
 mkRadians r = Radians $ mod' r (pi * 2)

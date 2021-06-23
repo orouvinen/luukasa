@@ -1,12 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Luukasa.Joint where
 
-import           Calc         (angle, distance, rotd)
+import           Calc         (angle, distance, rotd, rotdWithRange)
 import           Data.Aeson   (FromJSON, ToJSON)
 import           Data.Text    (Text)
 import           GHC.Generics (Generic)
+import           LimitedRange (LimitedRange)
 import           Units        (Degrees, getDegrees, getRadians, rad)
-
 type JointId = Int
 
 data JointLockMode
@@ -26,6 +26,7 @@ data Joint = Joint
     , jointY        :: Double
     , jointLocalRot :: Degrees -- ^ Rotation around parent joint
     , jointWorldRot :: Degrees -- ^ Rotation on screen
+    , jointRotLim   :: LimitedRange Degrees
     , jointR        :: Double --  ^ Distance (radius for rotation) to parent
     } deriving (Generic, Show)
 
@@ -51,17 +52,20 @@ setChildAngleAndRadius parent child =
         localRot = rotd worldRot (getDegrees $ -jointWorldRot parent)
     in child { jointLocalRot = localRot, jointWorldRot = worldRot, jointR = radius }
 
+{- | rotate deg parent rotatee rotates joint by deg degrees around parent joint.
+If the rotatee has set rotation limits, then delta will be modified so that rotation doesn't
+go over boundaries of the allowed range.
+-}
 rotate :: Double -> Joint -> Joint -> Joint
 rotate deg parent rotatee =
-    let
-        -- Update angle of rotation
-        localRot = rotd (jointLocalRot rotatee) deg
-        worldRot = rotd (jointWorldRot rotatee) deg
+    let oldLocalRot = jointLocalRot rotatee
+        newLocalRot = rotdWithRange (jointLocalRot rotatee) deg (jointRotLim rotatee)
+        effectiveDelta = newLocalRot - oldLocalRot
+        worldRot = rotd (jointWorldRot rotatee) (getDegrees effectiveDelta)
         -- Translate based on new rotation
         x = jointX parent + (jointR rotatee * cos (getRadians . rad $ worldRot))
         y = jointY parent + (jointR rotatee * sin (getRadians . rad $ worldRot))
-    in
-        rotatee { jointX = x, jointY = y, jointLocalRot = localRot, jointWorldRot = worldRot }
+    in rotatee { jointX = x, jointY = y, jointLocalRot = newLocalRot, jointWorldRot = worldRot }
 
 radiusPosition :: Joint -> Joint -> (Double, Double)
 radiusPosition parent child = (x, y)

@@ -9,12 +9,13 @@ import qualified GI.Gtk                    as Gtk
 import qualified GI.Gtk.Objects            as GO
 
 import           Control.Exception         (IOException, catch)
-import           Control.Monad             (foldM, unless, when)
+import           Control.Monad             (foldM, forM_, unless, void, when)
 import           Data.Foldable             (Foldable (toList))
 import           Data.Map                  (Map, (!))
 import qualified Data.Map                  as Map
 import           Data.Maybe                (fromJust)
 import qualified Data.Text                 as T
+import           LimitedRange              (lower, setLower, setUpper, upper)
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             actionState, initialState)
 import qualified Luukasa.AppState          as ST
@@ -24,6 +25,7 @@ import           Luukasa.Event.EventM      (EventM, runEvent)
 import qualified Luukasa.EventHandler      as EV
 import qualified Luukasa.Joint             as J
 import qualified Luukasa.Render            as Render (render)
+import           Units                     (getDegrees, mkDegrees)
 
 main :: IO ()
 main = do
@@ -45,10 +47,10 @@ runEventWithResult stateRef onError eventHandler = do
 
 jointToGValues :: J.Joint -> IO [Gtk.GValue]
 jointToGValues j = do
-    jx <- Gtk.toGValue $ J.jointX j
-    jy <- Gtk.toGValue $ J.jointY j
+    rotMin <- Gtk.toGValue $ getDegrees (lower $ J.jointRotLim j)
+    rotMax <- Gtk.toGValue $ getDegrees (upper $ J.jointRotLim j)
     jName <- Gtk.toGValue $ J.jointName j
-    return [jName, jx, jy]
+    return [jName, rotMin, rotMax]
 
 jointsAsGValues :: IORef AppState -> IO (Map J.JointId [Gtk.GValue])
 jointsAsGValues stateRef = do
@@ -90,6 +92,8 @@ buildUi stateRef = do
     jointListStore <- GO.builderGetObject builder "jointListStore" >>= Gtk.unsafeCastTo Gtk.ListStore . fromJust
     -- Joint list columns
     jointNameCell <- GO.builderGetObject builder "colJointName" >>= Gtk.unsafeCastTo Gtk.CellRendererText . fromJust
+    jointRotMinCell <- GO.builderGetObject builder "colJointRotMin" >>= Gtk.unsafeCastTo Gtk.CellRendererText . fromJust
+    jointRotMaxCell <- GO.builderGetObject builder "colJointRotMax" >>= Gtk.unsafeCastTo Gtk.CellRendererText . fromJust
 
 
     -- Bottom grid items
@@ -109,21 +113,64 @@ buildUi stateRef = do
 
     -- Event handlers
 
+    -- joint name edited
+
     _ <- Gtk.onCellRendererTextEdited jointNameCell $ \path enteredText -> do
             newVal <- Gtk.toGValue (Just enteredText)
             runEventHandler $ EV.setJointAttribute jointListStore path newVal 0 (\j -> j { J.jointName = Just enteredText })
             s <- readIORef stateRef
             writeIORef stateRef s { ST.isCellEditActive = False }
 
-    _ <- Gtk.onCellRendererEditingStarted jointNameCell $ \_ _ -> do
+    {- TODO:
+          - factor out the common pattern from these cell edited handlers
+          - error handling for input: don't set gvalue into cell if it's not valid input
+    -}
+
+    -- joint rotation min. edited
+    _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
+        newVal <- Gtk.toGValue (Just enteredText)
+        runEventHandler $ EV.setJointAttribute jointListStore path newVal 1
+            (\j ->
+                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+                in if null parsedInput
+                    then j
+                    else
+                        let enteredNum = fst . head $ parsedInput
+                            newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
+                        in j { J.jointRotLim = newLimit })
         s <- readIORef stateRef
-        writeIORef stateRef s { ST.isCellEditActive = True }
+        writeIORef stateRef s { ST.isCellEditActive = False }
+
+    _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
+        newVal <- Gtk.toGValue (Just enteredText)
+        runEventHandler $ EV.setJointAttribute jointListStore path newVal 2
+            (\j ->
+                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+                in if null parsedInput
+                    then j
+                    else
+                        let enteredNum = fst $ head parsedInput
+                            newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
+                        in j { J.jointRotLim = newLimit })
+        s <- readIORef stateRef
+        writeIORef stateRef s { ST.isCellEditActive = False }
+
+
+    -- Set editing flag when any of the joint list columns are getting edited
+    forM_
+        [jointNameCell, jointRotMinCell, jointRotMaxCell]
+        (\cell -> do
+            void $ Gtk.onCellRendererEditingStarted cell $ \_ _ -> do
+                s <- readIORef stateRef
+                writeIORef stateRef s { ST.isCellEditActive = True })
 
     _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
 
+    -- Align buttons
     _ <- Gtk.onButtonClicked btnAlignRadiusMin $ runEventHandler EV.alignRadiusesToMin >> Gtk.widgetQueueDraw canvas
     _ <- Gtk.onButtonClicked btnAlignRadiusMax $ runEventHandler EV.alignRadiusesToMax >> Gtk.widgetQueueDraw canvas
 
+    -- Lock mode radio buttons
     _ <- Gtk.onButtonClicked radioLockModeNoLock $ runEventHandler $ EV.selectLockMode J.LockNone
     _ <- Gtk.onButtonClicked radioLockModeDrag $ runEventHandler $ EV.selectLockMode J.LockDrag
     _ <- Gtk.onButtonClicked radioLockModeRotate $ runEventHandler $ EV.selectLockMode J.LockRotate
