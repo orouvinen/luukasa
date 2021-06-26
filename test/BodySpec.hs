@@ -3,10 +3,11 @@
 module BodySpec (spec) where
 import           Test.Hspec
 
-import qualified Luukasa.Body  as B
-import           Luukasa.Joint (Joint (Joint))
-import qualified Luukasa.Joint as J
-import qualified Tree          as T
+import           LimitedRange      (mkRange)
+import qualified Luukasa.Body      as B
+import qualified Luukasa.Data.Tree as T
+import           Luukasa.Joint     (Joint (Joint))
+import qualified Luukasa.Joint     as J
 
 mkJointAt :: Int -> Double -> Double -> Joint
 mkJointAt jointId x y = Joint
@@ -17,6 +18,7 @@ mkJointAt jointId x y = Joint
     , J.jointWorldRot = 0
     , J.jointR = 0
     , J.jointName = Nothing
+    , J.jointRotLim = mkRange 0 0
     }
 
 

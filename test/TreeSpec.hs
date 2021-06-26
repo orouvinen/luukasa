@@ -1,10 +1,10 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 module TreeSpec (spec) where
-import           Data.Foldable (toList)
+import           Data.Foldable     (toList)
 import           Data.Maybe
 import           Test.Hspec
 
-import qualified Tree          as T
+import qualified Luukasa.Data.Tree as T
 
 
 spec :: Spec

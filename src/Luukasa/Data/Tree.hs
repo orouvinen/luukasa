@@ -5,7 +5,7 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveTraversable #-}
 
-module Tree
+module Luukasa.Data.Tree
     ( Tree
     , val
     , children

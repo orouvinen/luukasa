@@ -9,9 +9,9 @@ import           Luukasa.Common
 import qualified Luukasa.Animation   as A
 import qualified Luukasa.AppState    as ST
 import qualified Luukasa.Body        as B
+import qualified Luukasa.Data.Tree   as T
 import qualified Luukasa.Joint       as J
 import           Luukasa.JointSelect as Sel
-import qualified Tree                as T
 
 data SelectMode = Set | Toggle
 data Action

@@ -20,24 +20,24 @@ module Luukasa.Body
     , createJoint)
     where
 
-import           Data.Foldable (toList)
-import           Data.Function ((&))
-import           Data.List     (foldl')
-import           Data.Map      (Map, (!))
-import qualified Data.Map      as Map
-import           Data.Maybe    (fromJust, fromMaybe)
-import           Luukasa.Joint (Joint, JointId, JointLockMode (..))
-import qualified Luukasa.Joint as J
-import           Tree          (Tree)
-import qualified Tree          as T (children, create, delete, findNode,
-                                     findNodeBy, insert, replaceNode,
-                                     replaceVal, setChildValues, setChildren,
-                                     setVal, val)
+import           Data.Foldable     (toList)
+import           Data.Function     ((&))
+import           Data.List         (foldl')
+import           Data.Map          (Map, (!))
+import qualified Data.Map          as Map
+import           Data.Maybe        (fromJust, fromMaybe)
+import           Luukasa.Data.Tree (Tree)
+import qualified Luukasa.Data.Tree as T (children, create, delete, findNode,
+                                         findNodeBy, insert, replaceNode,
+                                         replaceVal, setChildValues,
+                                         setChildren, setVal, val)
+import           Luukasa.Joint     (Joint, JointId, JointLockMode (..))
+import qualified Luukasa.Joint     as J
 
-import           Calc          (angle)
-import           Data.Aeson    (FromJSON, ToJSON)
-import           Data.Functor  ((<&>))
-import           GHC.Generics  (Generic)
+import           Calc              (angle)
+import           Data.Aeson        (FromJSON, ToJSON)
+import           Data.Functor      ((<&>))
+import           GHC.Generics      (Generic)
 import           LimitedRange
 import qualified Units
 

@@ -14,9 +14,9 @@ import qualified Luukasa.Animation as A
 import           Luukasa.Body      (Body)
 import qualified Luukasa.Body      as B
 import           Luukasa.Common    (TimerCallbackId, TimestampUs)
+import qualified Luukasa.Data.Tree as T
 import           Luukasa.Joint     (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint     as J
-import qualified Tree              as T
 
 data DragState = DragSelected DragMode | DragSelectionRect deriving Show
 data ActionState
