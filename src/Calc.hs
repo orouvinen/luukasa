@@ -14,7 +14,7 @@ rotd (getDegrees -> x) delta = mkDegrees $ rotated $ x + delta
 
 rotdWithRange :: Degrees -> Double -> LimitedRange Degrees -> Degrees
 rotdWithRange degFrom@(getDegrees -> x) delta range =
-    case LimitedRange.getEffectiveRange range of
+    case LimitedRange.effectiveRange range of
         Just r -> LimitedRange.fitValue r attemptedRotation
           where
             attemptedRotation = mkDegreesUnlimited $ x + delta

@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module LimitedRange
     ( LimitedRange
     , mkRange
@@ -7,18 +8,21 @@ module LimitedRange
     , upper
     , setLower
     , setUpper
-    , getEffectiveRange
+    , effectiveRange
     , isRangeEffective
     , fitValue)
     where
 
 import           Data.Aeson (FromJSON, ToJSON)
-newtype LimitedRange a = Range (a, a) deriving (FromJSON, ToJSON, Show)
+newtype LimitedRange a = LimitedRange (a, a) deriving (FromJSON, ToJSON)
 
-type Limitable a = (Ord a, Eq a, Show a)
+type Limitable a = (Ord a, Eq a)
+
+instance (Limitable a, Show a) => Show (LimitedRange a) where
+    show r = show (lower r) ++ ".." ++ show (upper r)
 
 mkRange :: Limitable a => a -> a -> LimitedRange a
-mkRange x y = Range (lower', upper')
+mkRange x y = LimitedRange (lower', upper')
   where
     lower' = min x y
     upper' = max x y
@@ -34,16 +38,16 @@ setUpper r upper' = mkRange lower' upper'
     lower' = lower r
 
 lower :: Limitable a => LimitedRange a -> a
-lower (Range r) = fst r
+lower (LimitedRange r) = fst r
 
 upper :: Limitable a => LimitedRange a -> a
-upper (Range r) = snd r
+upper (LimitedRange r) = snd r
 
 isRangeEffective :: Limitable a => LimitedRange a -> Bool
 isRangeEffective r = lower r /= upper r
 
-getEffectiveRange :: Limitable a => LimitedRange a -> Maybe (LimitedRange a)
-getEffectiveRange r =
+effectiveRange :: Limitable a => LimitedRange a -> Maybe (LimitedRange a)
+effectiveRange r =
     if isRangeEffective r
         then Just r
         else Nothing
