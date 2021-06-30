@@ -11,6 +11,7 @@ import qualified GI.Gtk.Objects            as GO
 import           Control.Exception         (IOException, catch)
 import           Control.Monad             (foldM, forM_, unless, void, when)
 import           Data.Foldable             (Foldable (toList))
+import           Data.Int                  (Int32)
 import           Data.Map                  (Map, (!))
 import qualified Data.Map                  as Map
 import           Data.Maybe                (fromJust)
@@ -127,33 +128,39 @@ buildUi stateRef = do
     -}
 
     -- joint rotation min. edited
-    _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
-        newVal <- Gtk.toGValue (Just enteredText)
-        runEventHandler $ EV.setJointAttribute jointListStore path newVal 1
-            (\j ->
-                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
-                in if null parsedInput
-                    then j
-                    else
-                        let enteredNum = fst . head $ parsedInput
-                            newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
-                        in j { J.jointRotLim = newLimit })
-        s <- readIORef stateRef
-        writeIORef stateRef s { ST.isCellEditActive = False }
+    -- _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
+    --     newVal <- Gtk.toGValue (Just enteredText)
+    --     runEventHandler $ EV.setJointAttribute jointListStore path newVal 1
+    --         (\j ->
+    --             let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+    --             in if null parsedInput
+    --                 then j
+    --                 else
+    --                     let enteredNum = fst . head $ parsedInput
+    --                         newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
+    --                     in j { J.jointRotLim = newLimit })
+    --     s <- readIORef stateRef
+    --     writeIORef stateRef s { ST.isCellEditActive = False }
 
-    _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
-        newVal <- Gtk.toGValue (Just enteredText)
-        runEventHandler $ EV.setJointAttribute jointListStore path newVal 2
-            (\j ->
-                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
-                in if null parsedInput
-                    then j
-                    else
-                        let enteredNum = fst $ head parsedInput
-                            newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
-                        in j { J.jointRotLim = newLimit })
-        s <- readIORef stateRef
-        writeIORef stateRef s { ST.isCellEditActive = False }
+    -- -- joint rotation max. edited
+    -- _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
+    --     newVal <- Gtk.toGValue (Just enteredText)
+    --     runEventHandler $ EV.setJointAttribute jointListStore path newVal 2
+    --         (\j ->
+    --             let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+    --             in if null parsedInput
+    --                 then j
+    --                 else
+    --                     let enteredNum = fst . head $ parsedInput
+    --                         newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
+    --                     in j { J.jointRotLim = newLimit })
+    --     s <- readIORef stateRef
+    --     writeIORef stateRef s { ST.isCellEditActive = False }
+
+    jointRotationLimitEdited stateRef jointListStore jointRotMaxCell 1
+            (\enteredNum j -> j { J.jointRotLim = setLower (J.jointRotLim j) (mkDegrees enteredNum) })
+    jointRotationLimitEdited stateRef jointListStore jointRotMaxCell 2
+            (\enteredNum j -> j { J.jointRotLim = setUpper (J.jointRotLim j) (mkDegrees enteredNum) })
 
 
     -- Set editing flag when any of the joint list columns are getting edited
@@ -274,6 +281,20 @@ showFileResult :: T.Text -> Gtk.Label -> Maybe T.Text -> IO ()
 showFileResult _ _ Nothing = return ()
 showFileResult verb label (Just filename) = Gtk.labelSetText label $ filename <> " " <> verb
 
+jointRotationLimitEdited :: IORef AppState -> Gtk.ListStore -> Gtk.CellRendererText -> Int32 -> (Double -> J.Joint -> J.Joint) -> IO ()
+jointRotationLimitEdited stateRef jointListStore limitValueCell colNum setJointLimit = do
+    void $ Gtk.onCellRendererTextEdited limitValueCell $ \path enteredText -> do
+        newVal <- Gtk.toGValue (Just enteredText)
+        runEvent stateRef $ EV.setJointAttribute jointListStore path newVal colNum
+            (\j ->
+                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+                in if null parsedInput
+                    then j
+                    else
+                        let enteredNum = fst . head $ parsedInput
+                        in setJointLimit enteredNum j)
+        s <- readIORef stateRef
+        writeIORef stateRef s { ST.isCellEditActive = False }
 
 playbackHandler :: IORef AppState -> Gtk.DrawingArea -> Gtk.Button -> IO ()
 playbackHandler stateRef canvas btnPlayback = do

@@ -249,8 +249,6 @@ setJointAttribute jointListStore path cellVal colNum updateJoint = do
                 jointId = jointIterLookup ! path
             E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId updateJoint) & updateAppState
 
-
-
 menuSave :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do
     filename <- gets ST.currentFileName
