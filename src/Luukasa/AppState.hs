@@ -1,126 +1,24 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ViewPatterns          #-}
-
+{-# LANGUAGE FlexibleContexts #-}
 module Luukasa.AppState where
 
-import           Data.Foldable     (toList)
-import           Data.Text         (Text)
-
-import           Data.Aeson        (FromJSON, ToJSON)
-import           Data.Map          (Map)
-import qualified Data.Map          as Map
-import           Data.Maybe        (mapMaybe)
-import           GHC.Generics      (Generic)
-import           Luukasa.Animation (Animation)
-import qualified Luukasa.Animation as A
-import           Luukasa.Body      (Body)
-import qualified Luukasa.Body      as B
-import           Luukasa.Common    (TimerCallbackId, TimestampUs)
-import qualified Luukasa.Data.Tree as T
-import           Luukasa.Joint     (Joint, JointId, JointLockMode (..))
-import qualified Luukasa.Joint     as J
-
-data DragState = DragSelected DragMode | DragSelectionRect deriving (Generic, Show)
-instance FromJSON DragState
-instance ToJSON DragState
-
-data ActionState
-    = Idle
-    | PlacingNewJoint
-    | Drag DragState
-    | AnimationPlayback TimerCallbackId
-    deriving (Generic, Show)
-
-instance FromJSON ActionState
-instance ToJSON ActionState
-
-data DragMode = DragMove | DragRotate deriving (Generic, Show)
-instance FromJSON DragMode
-instance ToJSON DragMode
-
-defaultFps :: Int
-defaultFps = 24
-
-initialAnimation :: Animation Body
-initialAnimation = A.appendFrame (A.mkAnimation defaultFps) B.create
+import           Luukasa.AnimatorState (AnimatorState, initialAnimatorState)
+import           Luukasa.UiState       (UiState, initialUiState)
+import Control.Monad.State (modify, MonadState)
 
 data AppState = AppState
-    { actionState       :: ActionState
-    , animation         :: Animation Body
-    , nextCreateJointId :: Int
-    , fileName          :: Maybe Text
-    , viewScale         :: Double
-    , translateX        :: Double
-    , translateY        :: Double
-    , selectedJointIds  :: [JointId]
-    , jointLockMode     :: JointLockMode
-    , dragMode          :: DragMode
-    , frameStart        :: Maybe TimestampUs
-    , currentFileName   :: Maybe Text
-    , jointIterLookup   :: Map Text J.JointId
-    , isCellEditActive  :: Bool
-    } deriving (Generic, Show)
-
-instance FromJSON AppState
-instance ToJSON AppState
-
-initialState :: AppState
-initialState = AppState
-    { actionState = Idle
-    , animation = initialAnimation
-    , nextCreateJointId = B.rootJointId + 1
-    , selectedJointIds = []
-    , fileName = Nothing
-    , viewScale = 1
-    , translateX = 0
-    , translateY = 0
-    , jointLockMode = LockNone
-    , dragMode = DragRotate
-    , frameStart = Nothing
-    , currentFileName = Nothing
-    , jointIterLookup = Map.empty
-    , isCellEditActive = False
+    { animatorState :: AnimatorState
+    , uiState       :: UiState
     }
 
-isPlaybackOn :: AppState -> Bool
-isPlaybackOn s = case actionState s of
-    AnimationPlayback _ -> True
-    _                   -> False
+initialAppState :: AppState
+initialAppState = AppState
+    { animatorState = initialAnimatorState
+    , uiState = initialUiState
+    }
 
-selectionSize :: AppState -> Int
-selectionSize = length . selectedJointIds
 
-visibleBody :: AppState -> Body
-visibleBody = A.currentFrameData . animation
+putUiState :: MonadState AppState m => UiState -> m ()
+putUiState x = modify (\s -> s { uiState = x })
 
-setVisibleBody :: AppState -> Body -> AppState
-setVisibleBody s b =
-    s { animation = A.setCurrentFrameData (animation s) b }
-
-selectedJoint :: AppState -> Maybe Joint
-selectedJoint s@(selectionSize -> 1) =
-    T.val <$> T.findNodeBy (\j -> J.jointId j == selectedJointId) body
-  where
-    body = B.root $ A.currentFrameData $ animation s
-    selectedJointId = head $ selectedJointIds s
-selectedJoint (selectionSize -> _) = Nothing
-
-selectedNonRootJoints :: AppState -> [Joint]
-selectedNonRootJoints s =
-    let body = A.currentFrameData $ animation s
-    in T.val <$> mapMaybe
-        (\jointId ->
-            if jointId == B.rootJointId
-                then Nothing
-                else T.findNodeBy (\j -> J.jointId j == jointId) (B.root body))
-        (selectedJointIds s)
-
-printJoints :: AppState -> String
-printJoints s = (\j -> show j ++ "\n") <$> toList $ B.root body
-  where
-    body = A.currentFrameData (animation s)
-
-printState :: AppState -> String
-printState s =
-    "animation:" ++ show (animation s) ++ "\n"
+putAnimatorState :: MonadState AppState m => AnimatorState -> m ()
+putAnimatorState x = modify (\s -> s { animatorState = x })

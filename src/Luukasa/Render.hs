@@ -1,7 +1,7 @@
 module Luukasa.Render (render) where
 
 import qualified Luukasa.Animation      as A
-import qualified Luukasa.AppState       as ST
+import qualified Luukasa.AnimatorState  as ST
 import qualified Luukasa.Body           as B
 import qualified Luukasa.Joint          as J
 import qualified Luukasa.JointSelect    as Sel
@@ -13,6 +13,7 @@ import           Data.IORef             (IORef, readIORef)
 
 import           GI.Cairo.Render        (Render)
 import qualified GI.Cairo.Render        as CR hiding (x, y)
+import qualified Luukasa.AppState       as App
 
 data Color = Color { r :: Double, g :: Double, b :: Double }
 
@@ -32,15 +33,15 @@ setSourceColor :: Color -> Render ()
 setSourceColor color = CR.setSourceRGB (r color) (g color) (b color)
 
 
-render :: IORef ST.AppState -> Render Bool
+render :: IORef App.AppState -> Render Bool
 render state = do
-    s <- liftIO $ readIORef state
+    s <- liftIO $ App.animatorState <$> readIORef state
 
     -- liftIO $ putStr $ "RENDER: " ++ ST.printState s
     runReaderT doRender s
     return True
 
-doRender :: ReaderT ST.AppState Render ()
+doRender :: ReaderT ST.AnimatorState Render ()
 doRender = do
     s <- ask
 
@@ -66,7 +67,7 @@ doRender = do
 
     renderTextInfo
 
-renderTextInfo :: ReaderT ST.AppState Render ()
+renderTextInfo :: ReaderT ST.AnimatorState Render ()
 renderTextInfo = do
     s <- ask
     let animation = ST.animation s
@@ -78,7 +79,7 @@ renderTextInfo = do
         CR.stroke
         renderSelectedJointInfo s selectedJoint
 
-renderSelectedJointInfo :: ST.AppState -> Maybe J.Joint -> Render ()
+renderSelectedJointInfo :: ST.AnimatorState -> Maybe J.Joint -> Render ()
 renderSelectedJointInfo _ Nothing = return ()
 renderSelectedJointInfo s (Just joint) = do
     -- let jointInfoString = "R:" ++ show (J.jointR joint)
@@ -91,7 +92,7 @@ renderSelectedJointInfo s (Just joint) = do
     return ()
 
 
-renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AppState Render ()
+renderLimb :: ((Double, Double), (Double, Double)) -> Color -> ReaderT ST.AnimatorState Render ()
 renderLimb limb color = do
     scaleFactor <- asks ST.viewScale
 
@@ -104,7 +105,7 @@ renderLimb limb color = do
         CR.setLineWidth $ fromIntegral limbWidth / scaleFactor
         CR.stroke
 
-renderJoint :: J.Joint -> ReaderT ST.AppState Render ()
+renderJoint :: J.Joint -> ReaderT ST.AnimatorState Render ()
 renderJoint j = do
     st <- ask
     let scaleFactor = ST.viewScale st

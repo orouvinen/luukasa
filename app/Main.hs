@@ -2,37 +2,41 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-import           Data.IORef                (IORef, newIORef, readIORef,
-                                            writeIORef)
-import           GI.Cairo.Render.Connector (renderWithContext)
-import qualified GI.Gdk                    as Gdk
-import qualified GI.Gtk                    as Gtk
-import qualified GI.Gtk.Objects            as GO
-
-import           Control.Exception         (IOException, catch)
-import           Control.Monad             (foldM, forM_, unless, void, when)
-import           Data.Foldable             (Foldable (toList))
-import           Data.Map                  (Map, (!))
-import qualified Data.Map                  as Map
-import           Data.Maybe                (fromJust)
-import qualified Data.Text                 as T
-import qualified Data.Text.IO              as TextIO (putStrLn)
-import           LimitedRange              (lower, setLower, setUpper, upper)
-import           Luukasa.AppState          (ActionState (..), AppState,
-                                            actionState, initialState)
-import qualified Luukasa.AppState          as ST
-import qualified Luukasa.Body              as B
-import           Luukasa.Common            (ErrorMessage)
-import           Luukasa.Event.EventM      (EventM, runEvent)
-import qualified Luukasa.EventHandler      as EV
-import qualified Luukasa.Joint             as J
-import qualified Luukasa.Render            as Render (render)
-import           Units                     (getDegrees, mkDegrees)
+import           Control.Exception                 (IOException, catch)
+import           Control.Monad                     (foldM, forM_, unless, void,
+                                                    when)
+import           Data.Foldable                     (Foldable (toList))
+import           Data.IORef                        (IORef, newIORef, readIORef,
+                                                    writeIORef)
+import           Data.Map                          (Map, (!))
+import qualified Data.Map                          as Map
+import           Data.Maybe                        (fromJust)
+import qualified Data.Text                         as T
+import qualified Data.Text.IO                      as TextIO (putStrLn)
+import           GI.Cairo.Render.Connector         (renderWithContext)
+import qualified GI.Gdk                            as Gdk
+import qualified GI.Gtk                            as Gtk
+import qualified GI.Gtk.Objects                    as GO
+import           LimitedRange                      (lower, setLower, setUpper,
+                                                    upper)
+import           Luukasa.AnimatorState             (ActionState (..))
+import qualified Luukasa.AnimatorState             as ST
+import           Luukasa.AppState                  (AppState)
+import qualified Luukasa.AppState                  as App
+import qualified Luukasa.Body                      as B
+import           Luukasa.Common                    (ErrorMessage)
+import           Luukasa.Event.EventM              (EventM, runEvent)
+import qualified Luukasa.Event.Handler             as EV
+import qualified Luukasa.Event.Handler.SeqGenModal as SeqGenModal
+import qualified Luukasa.Joint                     as J
+import qualified Luukasa.Render                    as Render (render)
+import qualified Luukasa.UiState                   as UI
+import           Units                             (getDegrees, mkDegrees)
 
 main :: IO ()
 main = do
     _ <- Gtk.init Nothing
-    newIORef initialState >>= buildUi
+    buildUi
     Gtk.main
 
 runEventWithResult
@@ -56,15 +60,18 @@ jointToGValues j = do
 
 jointsAsGValues :: IORef AppState -> IO (Map J.JointId [Gtk.GValue])
 jointsAsGValues stateRef = do
-    joints <- toList . B.root . ST.visibleBody <$> readIORef stateRef
+    joints <- toList . B.root . ST.visibleBody . App.animatorState <$> readIORef stateRef
     foldM (\lkup j -> do
             jointGValues <- jointToGValues j
             return $ Map.insert (J.jointId j) jointGValues lkup)
         Map.empty
         joints
 
-buildUi :: IORef AppState -> IO ()
-buildUi stateRef = do
+
+buildUi :: IO ()
+buildUi = do
+    stateRef <- newIORef App.initialAppState
+
     builder <- GO.builderNew
     _ <- GO.builderAddFromFile builder "ui/main.glade"
 
@@ -97,10 +104,15 @@ buildUi stateRef = do
     jointRotMinCell <- GO.builderGetObject builder "colJointRotMin" >>= Gtk.unsafeCastTo Gtk.CellRendererText . fromJust
     jointRotMaxCell <- GO.builderGetObject builder "colJointRotMax" >>= Gtk.unsafeCastTo Gtk.CellRendererText . fromJust
 
-
     -- Bottom grid items
     statusBar <- GO.builderGetObject builder "statusBarLabel" >>= Gtk.unsafeCastTo Gtk.Label . fromJust
-    Gtk.labelSetText statusBar "Luukasa started"
+
+    -- Dialog for sequence generation command
+    dlgSeqGen <- GO.builderGetObject builder "sequenceGenerate" >>= Gtk.unsafeCastTo Gtk.Dialog . fromJust
+    Gtk.windowSetTransientFor dlgSeqGen $ Just window
+
+    -- Menu item for sequence generation
+    editSeqGen <- GO.builderGetObject builder "editSeqGen" >>= Gtk.unsafeCastTo Gtk.MenuItem . fromJust
 
     -- Event runners
     let runEventHandler = runEvent stateRef
@@ -113,6 +125,51 @@ buildUi stateRef = do
             jointGValues <- jointsAsGValues stateRef
             runEventHandler $ EV.updateJointList jointListStore jointGValues
 
+    -- Seq. generation modal controls
+    genStartFrame                   <- GO.builderGetObject builder "genStartFrame"  >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genEndFrame                     <- GO.builderGetObject builder "genEndFrame"    >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genTargetX                      <- GO.builderGetObject builder "genTargetX"     >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genTargetY                      <- GO.builderGetObject builder "genTargetY"     >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genTargetLocalRot               <- GO.builderGetObject builder "genTargetLocalRot" >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genTargetWorldRot               <- GO.builderGetObject builder "genTargetWorldRot" >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genTargetRotDelta               <- GO.builderGetObject builder "genTargetRotDelta"  >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
+    genRadioSeqTypeStill            <- GO.builderGetObject builder "radioSeqTypeStill"     >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqTypeTranslate        <- GO.builderGetObject builder "radioSeqTypeTranslate" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqTypeRotate           <- GO.builderGetObject builder "radioSeqTypeRotate"    >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqTargetPos            <- GO.builderGetObject builder "radioSeqTargetPosition" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqTargetLocalRot       <- GO.builderGetObject builder "radioSeqTargetLocalRot" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqTargetWorldRot       <- GO.builderGetObject builder "radioSeqTargetWorldRot" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqTargetRotDelta       <- GO.builderGetObject builder "radioSeqTargetRotDelta" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqAccelTypePerFrame    <- GO.builderGetObject builder "radioGenAccelPerFrame"  >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+    genRadioSeqAccelTypePerSecond   <- GO.builderGetObject builder "radioGenAccelPerSecond" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
+
+    btnSeqGenOk <- GO.builderGetObject builder "genOk" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
+    btnSeqGenCancel <- GO.builderGetObject builder "genCancel" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
+
+    -- (numeric) entries
+    _ <- Gtk.onEditableChanged genStartFrame $ runEventHandler $ SeqGenModal.entryValueUpdated genStartFrame parseInt (\v s -> s { UI.startFrame = v })
+    _ <- Gtk.onEditableChanged genEndFrame $ runEventHandler $ SeqGenModal.entryValueUpdated genStartFrame parseInt (\v s -> s { UI.endFrame = v })
+    _ <- Gtk.onEditableChanged genTargetX $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetX parseDouble (\x s -> s { UI.targetX = x })
+    _ <- Gtk.onEditableChanged genTargetY $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\y s -> s { UI.targetY = y })
+    _ <- Gtk.onEditableChanged genTargetLocalRot $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\v s -> s { UI.targetLocalRot = v })
+    _ <- Gtk.onEditableChanged genTargetWorldRot $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\v s -> s { UI.targetWorldRot = v })
+    _ <- Gtk.onEditableChanged genTargetRotDelta $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\v s -> s { UI.targetRotDelta = v })
+
+    -- Sequence type selection radio buttons
+    _ <- Gtk.onButtonClicked genRadioSeqTypeStill $ runEventHandler $ SeqGenModal.setSeqType SeqGenModal.Still
+    _ <- Gtk.onButtonClicked genRadioSeqTypeTranslate $ runEventHandler $ SeqGenModal.setSeqType SeqGenModal.Translate
+    _ <- Gtk.onButtonClicked genRadioSeqTypeRotate $ runEventHandler $ SeqGenModal.setSeqType SeqGenModal.Rotate
+
+    -- Sequence accel type radio buttons
+    _ <- Gtk.onButtonClicked genRadioSeqAccelTypePerFrame $ runEventHandler $ SeqGenModal.setAccelType SeqGenModal.AccelPerFrame
+    _ <- Gtk.onButtonClicked genRadioSeqAccelTypePerSecond $ runEventHandler $ SeqGenModal.setAccelType SeqGenModal.AccelPerSecond
+
+    -- Sequence target type radio buttons
+    _ <- Gtk.onButtonClicked genRadioSeqTargetPos $ runEventHandler $ SeqGenModal.setTargetType SeqGenModal.TargetPos
+    _ <- Gtk.onButtonClicked genRadioSeqTargetLocalRot $ runEventHandler $ SeqGenModal.setTargetType SeqGenModal.TargetLocalRot
+    _ <- Gtk.onButtonClicked genRadioSeqTargetWorldRot $ runEventHandler $ SeqGenModal.setTargetType SeqGenModal.TargetWorldRot
+    _ <- Gtk.onButtonClicked genRadioSeqTargetRotDelta $ runEventHandler $ SeqGenModal.setTargetType SeqGenModal.TargetRotateDelta
+
     -- Event handlers
 
     -- joint name edited
@@ -120,7 +177,7 @@ buildUi stateRef = do
             newVal <- Gtk.toGValue (Just enteredText)
             runEventHandler $ EV.setJointAttribute jointListStore path newVal 0 (\j -> j { J.jointName = Just enteredText })
             s <- readIORef stateRef
-            writeIORef stateRef s { ST.isCellEditActive = False }
+            writeIORef stateRef $ s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } }
 
     -- joint rotation min. edited
     _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
@@ -135,7 +192,7 @@ buildUi stateRef = do
                             newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
                         in j { J.jointRotLim = newLimit })
         s <- readIORef stateRef
-        writeIORef stateRef s { ST.isCellEditActive = False }
+        writeIORef stateRef s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } }
 
     -- joint rotation max edited
     _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
@@ -150,7 +207,7 @@ buildUi stateRef = do
                             newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
                         in j { J.jointRotLim = newLimit })
         s <- readIORef stateRef
-        writeIORef stateRef s { ST.isCellEditActive = False }
+        writeIORef stateRef s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } }
 
 
     -- Set editing flag when any of the joint list columns are getting edited
@@ -159,7 +216,7 @@ buildUi stateRef = do
         (\cell -> do
             void $ Gtk.onCellRendererEditingStarted cell $ \_ _ -> do
                 s <- readIORef stateRef
-                writeIORef stateRef s { ST.isCellEditActive = True })
+                writeIORef stateRef s { App.uiState = (App.uiState s) { UI.isCellEditActive = True } })
 
     _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
 
@@ -177,7 +234,7 @@ buildUi stateRef = do
     _ <- Gtk.onWidgetDraw canvas $ renderWithContext (Render.render stateRef)
 
     _ <- Gtk.onTreeViewRowActivated jointListTreeView $ \path _ -> do
-        jointIterLookup <- ST.jointIterLookup <$> readIORef stateRef
+        jointIterLookup <- ST.jointIterLookup . App.animatorState <$> readIORef stateRef
         pathString <- Gtk.treePathToString path
         -- TODO: unsafe(ish)
         let jointId = jointIterLookup ! pathString
@@ -231,7 +288,7 @@ buildUi stateRef = do
         {- Update joint list on UI after every keypress, unless a cell value
            is currently being edited - we don't want to get in the middle of that.
         -}
-        isCellEditing <- ST.isCellEditActive <$> readIORef stateRef
+        isCellEditing <- UI.isCellEditActive . App.uiState <$> readIORef stateRef
         unless isCellEditing updateJointList
         return True
 
@@ -241,6 +298,8 @@ buildUi stateRef = do
         return True
 
     -- Menu item actions
+
+    -- File menu
     _ <- Gtk.onMenuItemActivate fileQuit Gtk.mainQuit
     _ <- Gtk.onMenuItemActivate fileSaveAs $ catch
                                             (runEventHandler (EV.menuSaveAs window) >>= showFileResult "saved" statusBar)
@@ -257,6 +316,13 @@ buildUi stateRef = do
                                                     updateJointList)
                                             handleIOException
 
+    -- Edit menu
+    _ <- Gtk.onMenuItemActivate editSeqGen $ do
+        res <- Gtk.dialogRun dlgSeqGen
+        Gtk.widgetHide dlgSeqGen
+        return ()
+
+
     -- View local coordinate [0,0] at center of the canvas
     _ <- Gtk.onWidgetSizeAllocate canvas $ \_ -> do
         newWidth <- fromIntegral <$> Gtk.widgetGetAllocatedWidth canvas
@@ -266,6 +332,7 @@ buildUi stateRef = do
 
     Gtk.widgetShowAll window
     updateJointList
+    Gtk.labelSetText statusBar "Luukasa started"
 
 handleIOException :: IOException -> IO ()
 handleIOException = print
@@ -279,9 +346,9 @@ playbackHandler :: IORef AppState -> Gtk.DrawingArea -> Gtk.Button -> IO ()
 playbackHandler stateRef canvas btnPlayback = do
     let runEventHandler = runEvent stateRef
 
-    appState <- readIORef stateRef
+    animatorState <- App.animatorState <$> readIORef stateRef
 
-    case actionState appState of
+    case ST.actionState animatorState of
         AnimationPlayback callbackId -> do
             Gtk.buttonSetLabel btnPlayback "Play"
             runEventHandler EV.stopPlayback
@@ -301,3 +368,18 @@ playbackHandler stateRef canvas btnPlayback = do
             timestamp <- Gdk.frameClockGetFrameTime frameClock
             runEventHandler $ EV.startPlayback tickCallbackId timestamp
         _ -> return ()
+
+{- Something needs to be done to these. And they don't belong here either. But for now I just want things to work. Hence these parse-things. -}
+parseInt :: T.Text -> Maybe Int
+parseInt x =
+    let parsed = reads (T.unpack x) :: [(Int, String)]
+    in if null parsed
+        then Nothing
+        else Just $ fst $ head parsed
+
+parseDouble :: T.Text -> Maybe Double
+parseDouble x =
+    let parsed = reads (T.unpack x) :: [(Double, String)]
+    in if null parsed
+        then Nothing
+        else Just $ fst $ head parsed

@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Luukasa.EditorAction (Action(..), SelectMode(..), dispatchAction, ErrorMessage, ActionResult) where
 
-import           Data.Foldable       (foldl')
-import           Data.Function       ((&))
-import qualified Data.Text           as T
+import           Data.Foldable         (foldl')
+import           Data.Function         ((&))
+import qualified Data.Text             as T
 import           Luukasa.Common
 
-import qualified Luukasa.Animation   as A
-import qualified Luukasa.AppState    as ST
-import qualified Luukasa.Body        as B
-import qualified Luukasa.Data.Tree   as T
-import qualified Luukasa.Joint       as J
-import           Luukasa.JointSelect as Sel
+import qualified Luukasa.Animation     as A
+import qualified Luukasa.AnimatorState as ST
+import qualified Luukasa.Body          as B
+import qualified Luukasa.Data.Tree     as T
+import qualified Luukasa.Joint         as J
+import           Luukasa.JointSelect   as Sel
 
 data SelectMode = Set | Toggle
 data Action
@@ -30,9 +30,9 @@ data Action
     | ApplyToAnimationJointWithId J.JointId (J.Joint -> J.Joint)
 
 
-type ActionResult = Either ErrorMessage ST.AppState
+type ActionResult = Either ErrorMessage ST.AnimatorState
 
-dispatchAction :: ST.AppState -> Action -> ActionResult
+dispatchAction :: ST.AnimatorState -> Action -> ActionResult
 dispatchAction s e =
     case e of
         ApplyToAnimationJointWithId jointId f -> modifyAnimationJointWith s jointId f
@@ -49,12 +49,12 @@ dispatchAction s e =
         LevelSelectedRadiusesToMin -> levelSelectedRadiuses s minimum
         LevelSelectedRadiusesToMax -> levelSelectedRadiuses s maximum
 
-modifyAnimationJointWith :: ST.AppState -> J.JointId -> (J.Joint -> J.Joint) -> ActionResult
+modifyAnimationJointWith :: ST.AnimatorState -> J.JointId -> (J.Joint -> J.Joint) -> ActionResult
 modifyAnimationJointWith s jointId f =
     Right s { ST.animation = fmap (B.applyToJoint jointId f) (ST.animation s)}
 
 
-createJoint :: ST.AppState -> Int -> Int -> ActionResult
+createJoint :: ST.AnimatorState -> Int -> Int -> ActionResult
 createJoint s x y =
     let animation = ST.animation s
         body = ST.visibleBody s
@@ -68,7 +68,7 @@ createJoint s x y =
         , ST.nextCreateJointId = newJointId + 1
         }
 
-deleteSelectedJoints :: ST.AppState -> ActionResult
+deleteSelectedJoints :: ST.AnimatorState -> ActionResult
 deleteSelectedJoints s =
     let animation = ST.animation s
         jointIds = J.jointId <$> ST.selectedNonRootJoints s
@@ -76,7 +76,7 @@ deleteSelectedJoints s =
         applyDelete = \b -> foldl' (&) b deleteActions
     in Right s { ST.animation = applyDelete <$> animation }
 
-trySelect :: ST.AppState -> Int -> Int -> SelectMode -> ActionResult
+trySelect :: ST.AnimatorState -> Int -> Int -> SelectMode -> ActionResult
 trySelect s x y selectMode =
     let body = A.currentFrameData $ ST.animation s
         translateX = ST.translateX s
@@ -90,12 +90,12 @@ trySelect s x y selectMode =
                                     Toggle -> Sel.toggle jointId (ST.selectedJointIds s)
             in Right s { ST.selectedJointIds = selectedJointIds }
 
-rotateSelected :: ST.AppState -> Double -> ActionResult
+rotateSelected :: ST.AnimatorState -> Double -> ActionResult
 rotateSelected s deg = Right
     $ withCurrentFrameSelectedJoints s
     $ B.rotateJoint (ST.jointLockMode s) deg
 
-rotateSelectedTowards :: ST.AppState -> Double -> Double -> ActionResult
+rotateSelectedTowards :: ST.AnimatorState -> Double -> Double -> ActionResult
 rotateSelectedTowards s x y =
     let (translateX, translateY) = (ST.translateX s, ST.translateY s)
         (localX, localY) = screenToLocal (ST.viewScale s) translateX translateY (truncate x) (truncate y)
@@ -103,7 +103,7 @@ rotateSelectedTowards s x y =
         $ withCurrentFrameSelectedJoints s
         $ B.rotateJointTowards localX localY (ST.jointLockMode s)
 
-moveSelected :: ST.AppState -> Double -> Double -> ActionResult
+moveSelected :: ST.AnimatorState -> Double -> Double -> ActionResult
 moveSelected s x y =
     let animation = ST.animation s
         body = A.currentFrameData animation
@@ -119,19 +119,19 @@ moveSelected s x y =
             let body' = B.setJointPosition localX localY j body
             in Right s { ST.animation = A.setCurrentFrameData animation body' }
 
-createFrame :: ST.AppState -> ActionResult
+createFrame :: ST.AnimatorState -> ActionResult
 createFrame s =
     let body = ST.visibleBody s
         animation = ST.animation s
     in Right s { ST.animation = A.appendFrame animation body }
 
-deleteFrame :: ST.AppState -> ActionResult
+deleteFrame :: ST.AnimatorState -> ActionResult
 deleteFrame s = Right s { ST.animation = A.deleteCurrentFrame (ST.animation s)}
 
-frameStep :: ST.AppState -> Int -> ActionResult
+frameStep :: ST.AnimatorState -> Int -> ActionResult
 frameStep s n = Right s { ST.animation = A.frameStep (ST.animation s) n }
 
-levelSelectedRadiuses :: ST.AppState -> ([Double] -> Double) -> ActionResult
+levelSelectedRadiuses :: ST.AnimatorState -> ([Double] -> Double) -> ActionResult
 levelSelectedRadiuses s selectRadius =
     let radius = selectRadius (J.jointR <$> ST.selectedNonRootJoints s)
     in Right
@@ -144,9 +144,9 @@ levelSelectedRadiuses s selectRadius =
     withCurrentFrameSelectedJoints applies a function `f` to all selected joints in the current frame.
     `f` is is given a joint and the body it belongs to, and should return new body with the modified joint.
 
-    New AppState with the modified frame data (body) is returned.
+    New AnimatorState with the modified frame data (body) is returned.
 -}
-withCurrentFrameSelectedJoints :: ST.AppState -> (J.Joint -> B.Body -> B.Body) -> ST.AppState
+withCurrentFrameSelectedJoints :: ST.AnimatorState -> (J.Joint -> B.Body -> B.Body) -> ST.AnimatorState
 withCurrentFrameSelectedJoints st f =
     let animation = ST.animation st
         js = ST.selectedNonRootJoints st

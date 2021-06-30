@@ -1,7 +1,9 @@
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 module Luukasa.Event.EventM where
 
+import           Luukasa.AnimatorState      (AnimatorState)
 import           Luukasa.AppState           (AppState)
 import           Luukasa.Event.JsonFileIO   (JsonFileIO (..))
 import           Luukasa.Event.Keyboard     (HasKeyEvent (..))
@@ -55,7 +57,7 @@ instance HasTreeView EventM where
                 then Just $ snd iterRes
                 else Nothing
 
-instance JsonFileIO AppState EventM where
+instance JsonFileIO AnimatorState EventM where
     writeJson filename appState = do
         let json = encode appState
         liftIO $ BS.writeFile filename json

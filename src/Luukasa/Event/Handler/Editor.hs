@@ -1,69 +1,60 @@
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLabels      #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-module Luukasa.EventHandler where
+module Luukasa.Event.Handler.Editor where
 
-import           Control.Monad              (foldM, unless, void, when)
-import           Control.Monad.IO.Class     (MonadIO)
-import           Control.Monad.State        (MonadState, get, gets, modify, put)
-import           Data.Foldable              (forM_)
-import           Data.Function              ((&))
-import           Data.GI.Base               (AttrOp ((:=)), new)
-import           Data.Int                   (Int32)
-import           Data.Map                   ((!))
-import qualified Data.Map                   as Map
-import           Data.Maybe                 (fromJust)
-import           Data.Text                  (Text, pack, unpack)
-import qualified GI.Gdk                     as Gdk
-import qualified GI.Gtk                     as Gtk
-import qualified Luukasa.Animation          as Animation
-import qualified Luukasa.Animation          as A
-import           Luukasa.AppState           (ActionState (..), AppState,
-                                             DragMode (..), DragState (..))
-import qualified Luukasa.AppState           as ST
-import qualified Luukasa.Body               as B
-import           Luukasa.Common             (ErrorMessage, TimerCallbackId,
-                                             TimestampUs)
-import           Luukasa.EditorAction       as E (Action (..), ActionResult,
-                                                  SelectMode (..),
-                                                  dispatchAction)
-import           Luukasa.Event.JsonFileIO   (JsonFileIO (..))
-import           Luukasa.Event.Keyboard     (HasKeyEvent (..))
-import           Luukasa.Event.Mouse        (HasMouseEvent, clickModifiers,
-                                             clickPos, getScrollDirection,
-                                             motionModifiers, motionPos)
+import           Control.Monad                     (foldM, unless, void, when)
+import           Control.Monad.IO.Class            (MonadIO)
+import           Control.Monad.State               (MonadState, gets, modify)
+import           Data.Foldable                     (forM_)
+import           Data.Function                     ((&))
+import           Data.GI.Base                      (AttrOp ((:=)), new)
+import           Data.Int                          (Int32)
+import           Data.Map                          ((!))
+import qualified Data.Map                          as Map
+import           Data.Text                         (Text, pack, unpack)
+import qualified GI.Gdk                            as Gdk
+import qualified GI.Gtk                            as Gtk
+import qualified Luukasa.Animation                 as A
+import           Luukasa.AnimatorState             (ActionState (..),
+                                                    AnimatorState,
+                                                    DragMode (..),
+                                                    DragState (..))
+
+import           Data.Functor                      ((<&>))
+import qualified Luukasa.AnimatorState             as ST
+import           Luukasa.AppState                  (AppState)
+import qualified Luukasa.AppState                  as App
+import qualified Luukasa.Body                      as B
+import           Luukasa.Common                    (ErrorMessage)
+import           Luukasa.EditorAction              as E (Action (..),
+                                                         SelectMode (..),
+                                                         dispatchAction)
+import           Luukasa.Event.Handler.EventResult (EventResult, toEventResult,
+                                                    updateAnimatorState)
+import           Luukasa.Event.JsonFileIO          (JsonFileIO (..))
+import           Luukasa.Event.Keyboard            (HasKeyEvent (..))
+import           Luukasa.Event.Mouse               (HasMouseEvent,
+                                                    clickModifiers, clickPos,
+                                                    getScrollDirection,
+                                                    motionModifiers, motionPos)
 import           Luukasa.Event.Ui.UiElement
-import           Luukasa.Joint              (Joint, JointId, JointLockMode (..))
-import qualified Luukasa.Joint              as J
-
-
-type EventResult a = Either ErrorMessage a
+import           Luukasa.Joint                     (Joint, JointId,
+                                                    JointLockMode (..))
+import qualified Luukasa.Joint                     as J
 
 jointDragLockModifier, selectToggleModifier :: Gdk.ModifierType
 jointDragLockModifier = Gdk.ModifierTypeShiftMask
 selectToggleModifier = Gdk.ModifierTypeControlMask
 
-
-toEventResult :: Monad m => ActionResult -> a -> m (EventResult a)
-toEventResult res retval =
-    return $ case res of
-        Right _  -> Right retval
-        Left err -> Left err
-
-updateAppState :: MonadState AppState m => Either a AppState -> m ()
-updateAppState = \case
-    Left _         -> return ()
-    Right newState -> put newState
-
 selectLockMode :: MonadState AppState m => JointLockMode -> m ()
-selectLockMode lockMode = modify (\s -> s { ST.jointLockMode = lockMode })
+selectLockMode lockMode = modify (\s -> s { App.animatorState = (App.animatorState s) { ST.jointLockMode = lockMode } })
 
 canvasPrimaryMouseButtonClick :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonClick e = do
-    appState <- get
+    s <- gets App.animatorState
 
     (x', y') <- clickPos e
     let x = truncate x'
@@ -71,48 +62,22 @@ canvasPrimaryMouseButtonClick e = do
 
     toggleSelect <- elem selectToggleModifier <$> clickModifiers e
 
-    let dispatch = dispatchAction appState
-        result = case ST.actionState appState of
+    let dispatch = dispatchAction s
+        result = case ST.actionState s of
             PlacingNewJoint -> dispatch $ E.CreateJoint x y
             Idle            -> dispatch $ E.TrySelect x y $ if toggleSelect then Toggle else Set
-            _               -> Right appState
+            _               -> Right s
 
-    updateAppState result
-
+    updateAnimatorState result
 
 canvasPrimaryMouseButtonRelease :: MonadState AppState m => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonRelease _ = do
-    s <- get
-    unless (ST.isPlaybackOn s) $ put s { ST.actionState = Idle }
-
-startPlayback :: MonadState AppState m => TimerCallbackId -> TimestampUs -> m ()
-startPlayback timerCallbackId timestamp =
-    modify (\s -> s { ST.actionState = AnimationPlayback timerCallbackId
-                    , ST.frameStart = Just timestamp
-                    })
-
-stopPlayback :: MonadState AppState m => m ()
-stopPlayback = modify (\s -> s { ST.actionState = Idle, ST.frameStart = Nothing })
-
-playbackTick :: MonadState AppState m => TimestampUs -> m Bool
-playbackTick timestamp = do
-    s <- get
-    let frameIntervalUs = (1.0 / (fromIntegral (Animation.fps $ ST.animation s) :: Double)) * 1000 * 1000
-        lastFrame = fromJust (ST.frameStart s)
-        sinceLastFrame = timestamp - lastFrame
-        renderNeeded = fromIntegral sinceLastFrame >= frameIntervalUs
-
-    when renderNeeded $ do
-        -- timestamp might not be totally accurate for frameStart if
-        -- this frame is delayed. Should probably set the originally intended frameStart?
-        let result = dispatchAction s { ST.frameStart = Just timestamp } (E.FrameStep 1)
-        updateAppState result
-
-    return renderNeeded
+    isPlaybackOn <- gets (ST.isPlaybackOn . App.animatorState)
+    unless isPlaybackOn $ modify (\s' -> s' { App.animatorState = (App.animatorState s') { ST.actionState = Idle } })
 
 canvasKeyPress :: (MonadState AppState m, HasKeyEvent m) => Gdk.EventKey -> m (EventResult ())
 canvasKeyPress eventKey = do
-    s <- get
+    s <- gets App.animatorState
     key <- getKey eventKey
 
     let dispatch = dispatchAction s
@@ -131,7 +96,7 @@ canvasKeyPress eventKey = do
             Gdk.KEY_Right       -> dispatch $ E.FrameStep 1
             _                   -> Right s
 
-    updateAppState result
+    updateAnimatorState result
     toEventResult result ()
 
 scrollWheelScaleStep :: Double
@@ -146,11 +111,13 @@ canvasScrollWheel eventScroll = do
             then -scrollWheelScaleStep
             else scrollWheelScaleStep
 
-    modify (\s -> s { ST.viewScale = ST.viewScale s + scaleChange })
+    s <- gets App.animatorState
+    App.putAnimatorState s { ST.viewScale = ST.viewScale s + scaleChange }
+
 
 canvasMouseMotion :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventMotion -> m ()
 canvasMouseMotion e = do
-    appState <- get
+    appState <- gets App.animatorState
 
     mouseBtnPressed <- elem Gdk.ModifierTypeButton1Mask <$> motionModifiers e
     toggleDragMode <- elem jointDragLockModifier <$> motionModifiers e
@@ -173,31 +140,37 @@ canvasMouseMotion e = do
                 DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
         let result = E.dispatchAction appState { ST.actionState = Drag dragState } action
-        updateAppState result
+        updateAnimatorState result
 
 alignRadiusesToMin :: MonadState AppState m => m ()
 alignRadiusesToMin = do
-    appState <- get
-    E.dispatchAction appState E.LevelSelectedRadiusesToMin & updateAppState
+    s <- gets App.animatorState
+    E.dispatchAction s E.LevelSelectedRadiusesToMin & updateAnimatorState
 
 alignRadiusesToMax :: MonadState AppState m => m ()
 alignRadiusesToMax = do
-    appState <- get
-    E.dispatchAction appState E.LevelSelectedRadiusesToMax & updateAppState
+    s <- gets App.animatorState
+    E.dispatchAction s E.LevelSelectedRadiusesToMax & updateAnimatorState
 
-setViewScale :: MonadState AppState m => Double -> m ()
-setViewScale scaleFactor = modify (\s -> s { ST.viewScale = scaleFactor })
+setViewScale ::  MonadState AppState m => Double -> m ()
+setViewScale scaleFactor = do
+    s <- gets App.animatorState
+    App.putAnimatorState s { ST.viewScale = scaleFactor }
 
-setViewTranslate :: MonadState AppState m => Double -> Double -> m ()
-setViewTranslate trX trY = modify (\s -> s { ST.translateX = trX, ST.translateY = trY })
+setViewTranslate ::  MonadState AppState m => Double -> Double -> m ()
+setViewTranslate trX trY = do
+    s <- gets App.animatorState
+    App.putAnimatorState s { ST.translateX = trX, ST.translateY = trY }
 
-modifyAnimationJointWith :: (MonadState AppState m) => JointId -> (Joint -> Joint) -> m ()
+modifyAnimationJointWith :: MonadState AppState m => JointId -> (Joint -> Joint) -> m ()
 modifyAnimationJointWith jointId f = do
-    appState <- get
-    E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId f) & updateAppState
+    s <- gets App.animatorState
+    E.dispatchAction s (E.ApplyToAnimationJointWithId jointId f) & updateAnimatorState
 
 selectJoint :: MonadState AppState m => JointId -> m ()
-selectJoint jointId = modify (\s -> s { ST.selectedJointIds = [jointId] })
+selectJoint jointId = do
+    s <- gets App.animatorState
+    App.putAnimatorState s { ST.selectedJointIds = [jointId] }
 
 updateJointList
     :: (MonadState AppState m, HasUiListStore m)
@@ -205,10 +178,10 @@ updateJointList
     -> Map.Map JointId [Gtk.GValue]
     -> m ()
 updateJointList jointListStore jointValues = do
-    appState <- get
+    s <- gets App.animatorState
     clearListStore jointListStore
 
-    let joints = B.toJointList $ A.currentFrameData (ST.animation appState)
+    let joints = B.toJointList $ A.currentFrameData (ST.animation s)
 
     iterLookup <- foldM (\lkup j -> do
             iter <- insertListRow jointListStore (jointValues ! J.jointId j)
@@ -217,7 +190,7 @@ updateJointList jointListStore jointValues = do
         (Map.empty :: Map.Map Text JointId)
         joints
 
-    modify (\s -> s { ST.jointIterLookup = iterLookup })
+    App.putAnimatorState s { ST.jointIterLookup = iterLookup }
 
 {- TODO: this is awful in few different ways.
 Of course, everything has potential for refactoring, but oh boy
@@ -242,38 +215,36 @@ setJointAttribute jointListStore path cellVal colNum updateJoint = do
         Just iter -> do
             listStoreSetValue jointListStore iter colNum cellVal
 
-            appState <- get
+            appState <- gets App.animatorState
             let jointIterLookup = ST.jointIterLookup appState
                 jointId = jointIterLookup ! path
-            E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId updateJoint) & updateAppState
+            E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId updateJoint) & updateAnimatorState
 
-
-
-menuSave :: (MonadState AppState m, JsonFileIO AppState m) => Gtk.Window -> m (Maybe Text)
+menuSave :: (MonadState AppState m, JsonFileIO AnimatorState m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do
-    filename <- gets ST.currentFileName
+    filename <- gets App.animatorState <&> ST.currentFileName
     case filename of
         Nothing -> void $ menuSaveAs w
         Just f  -> writeAnimationToFile f
     return filename
 
-menuSaveAs :: (MonadState AppState m, JsonFileIO AppState m) => Gtk.Window -> m (Maybe Text)
+menuSaveAs :: (MonadState AppState m, JsonFileIO AnimatorState m) => Gtk.Window -> m (Maybe Text)
 menuSaveAs w = do
     filename <- saveFileChooserDialog w
     forM_ filename writeAnimationToFile
     return filename
 
-writeAnimationToFile :: (MonadState AppState m, JsonFileIO AppState m) => Text -> m ()
+writeAnimationToFile :: (MonadState AppState m, JsonFileIO AnimatorState m) => Text -> m ()
 writeAnimationToFile filename = do
-    appState <- get
-    writeJson (unpack filename) appState
-    modify (\s -> s { ST.currentFileName = Just filename })
+    s <- gets App.animatorState
+    writeJson (unpack filename) s
+    App.putAnimatorState s { ST.currentFileName = Just filename }
 
 {- If JSON decoding fails, Left "error message" will be returned just the way it comes from Aeson.
 If nothing goes wrong, then we might have a filename (Right Maybe "filename") if the
 file chooser dialog wasn't canceled.
 -}
-menuOpen :: (MonadState AppState m, JsonFileIO AppState m) => Gtk.Window -> m (Either ErrorMessage (Maybe Text))
+menuOpen :: (MonadState AppState m, JsonFileIO AnimatorState m) => Gtk.Window -> m (Either ErrorMessage (Maybe Text))
 menuOpen w = do
     filename <- openFileChooserDialog w
 
@@ -283,8 +254,8 @@ menuOpen w = do
             decoded <- readJson (unpack f)
             case decoded of
                 Left err -> return $ Left (pack err)
-                Right appState -> do
-                    put appState
+                Right animatorState -> do
+                    App.putAnimatorState animatorState
                     return $ Right (Just f)
 
 
@@ -296,9 +267,13 @@ openFileChooserDialog = fileChooserDialog Gtk.FileChooserActionOpen
 
 fileChooserDialog :: MonadIO m => Gtk.FileChooserAction -> Gtk.Window -> m (Maybe Text)
 fileChooserDialog actionType mainWindow = do
-    dlg <- new Gtk.FileChooserDialog [ #title := "Save animation"
-                                     , #action := actionType
-                                     ]
+    dlg <- new Gtk.FileChooserDialog
+        [ #title :=
+            if actionType == Gtk.FileChooserActionSave
+                then "Save animation"
+                else "Open animation"
+        , #action := actionType
+        ]
 
     Gtk.windowSetTransientFor dlg $ Just mainWindow
 
