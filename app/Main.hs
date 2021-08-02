@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
@@ -15,6 +16,7 @@ import           Data.Map                  (Map, (!))
 import qualified Data.Map                  as Map
 import           Data.Maybe                (fromJust)
 import qualified Data.Text                 as T
+import qualified Data.Text.IO              as TextIO (putStrLn)
 import           LimitedRange              (lower, setLower, setUpper, upper)
 import           Luukasa.AppState          (ActionState (..), AppState,
                                             actionState, initialState)
@@ -114,17 +116,11 @@ buildUi stateRef = do
     -- Event handlers
 
     -- joint name edited
-
     _ <- Gtk.onCellRendererTextEdited jointNameCell $ \path enteredText -> do
             newVal <- Gtk.toGValue (Just enteredText)
             runEventHandler $ EV.setJointAttribute jointListStore path newVal 0 (\j -> j { J.jointName = Just enteredText })
             s <- readIORef stateRef
             writeIORef stateRef s { ST.isCellEditActive = False }
-
-    {- TODO:
-          - factor out the common pattern from these cell edited handlers
-          - error handling for input: don't set gvalue into cell if it's not valid input
-    -}
 
     -- joint rotation min. edited
     _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
@@ -141,6 +137,7 @@ buildUi stateRef = do
         s <- readIORef stateRef
         writeIORef stateRef s { ST.isCellEditActive = False }
 
+    -- joint rotation max edited
     _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
         newVal <- Gtk.toGValue (Just enteredText)
         runEventHandler $ EV.setJointAttribute jointListStore path newVal 2
@@ -252,9 +249,12 @@ buildUi stateRef = do
                                             (runEventHandler (EV.menuSave window) >>= showFileResult "saved" statusBar)
                                             handleIOException
     _ <- Gtk.onMenuItemActivate fileOpen $ catch
-                                            (runEventHandler (EV.menuOpen window) >>= showFileResult "loaded" statusBar >>
-                                            Gtk.widgetQueueDraw canvas >>
-                                            updateJointList)
+                                            (runEventHandler (EV.menuOpen window) >>= \case
+                                                Left err -> TextIO.putStrLn err
+                                                Right filename -> do
+                                                    showFileResult "loaded" statusBar filename
+                                                    Gtk.widgetQueueDraw canvas
+                                                    updateJointList)
                                             handleIOException
 
     -- View local coordinate [0,0] at center of the canvas

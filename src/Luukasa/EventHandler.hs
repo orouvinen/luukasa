@@ -6,11 +6,10 @@
 
 module Luukasa.EventHandler where
 
-import           Control.Monad              (foldM, forM, join, unless, void,
-                                             when)
+import           Control.Monad              (foldM, unless, void, when)
 import           Control.Monad.IO.Class     (MonadIO, liftIO)
 import           Control.Monad.State        (MonadState, get, gets, modify, put)
-import           Data.Aeson                 (decode, encode)
+import           Data.Aeson                 (eitherDecode, encode)
 import qualified Data.ByteString.Lazy       as BS (readFile, writeFile)
 import           Data.Foldable              (forM_)
 import           Data.Function              ((&))
@@ -271,16 +270,25 @@ writeAnimationToFile filename = do
     liftIO $ BS.writeFile (unpack filename) json
     modify (\s -> s { ST.currentFileName = Just filename })
 
-menuOpen :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+{- If JSON decoding fails, Left "error message" will be returned just the way it comes from Aeson.
+If nothing goes wrong, then we might have a filename (Right Maybe "filename") if the
+file chooser dialog wasn't canceled.
+-}
+menuOpen :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Either ErrorMessage (Maybe Text))
 menuOpen w = do
     state <- get
     filename <- openFileChooserDialog w
 
-    join <$> forM filename (\f -> do
-        json <- liftIO $ BS.readFile (unpack f)
-        forM (decode json) (\a -> do
-            put state { ST.animation = a, ST.currentFileName = Just f }
-            return f))
+    case filename of
+        Nothing -> return $ Right Nothing
+        Just f -> do
+            json <- liftIO $ BS.readFile (unpack f)
+            let decoded = eitherDecode json
+            case decoded of
+                Left err -> return $ Left (pack err)
+                Right animation -> do
+                    put state { ST.animation = animation, ST.currentFileName = filename }
+                    return $ Right (Just f)
 
 
 saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe Text)
