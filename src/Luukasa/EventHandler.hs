@@ -7,10 +7,8 @@
 module Luukasa.EventHandler where
 
 import           Control.Monad              (foldM, unless, void, when)
-import           Control.Monad.IO.Class     (MonadIO, liftIO)
+import           Control.Monad.IO.Class     (MonadIO)
 import           Control.Monad.State        (MonadState, get, gets, modify, put)
-import           Data.Aeson                 (eitherDecode, encode)
-import qualified Data.ByteString.Lazy       as BS (readFile, writeFile)
 import           Data.Foldable              (forM_)
 import           Data.Function              ((&))
 import           Data.GI.Base               (AttrOp ((:=)), new)
@@ -32,6 +30,7 @@ import           Luukasa.Common             (ErrorMessage, TimerCallbackId,
 import           Luukasa.EditorAction       as E (Action (..), ActionResult,
                                                   SelectMode (..),
                                                   dispatchAction)
+import           Luukasa.Event.JsonFileIO   (JsonFileIO (..))
 import           Luukasa.Event.Keyboard     (HasKeyEvent (..))
 import           Luukasa.Event.Mouse        (HasMouseEvent, clickModifiers,
                                              clickPos, getScrollDirection,
@@ -250,7 +249,7 @@ setJointAttribute jointListStore path cellVal colNum updateJoint = do
 
 
 
-menuSave :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+menuSave :: (MonadState AppState m, JsonFileIO AppState m) => Gtk.Window -> m (Maybe Text)
 menuSave w = do
     filename <- gets ST.currentFileName
     case filename of
@@ -258,36 +257,34 @@ menuSave w = do
         Just f  -> writeAnimationToFile f
     return filename
 
-menuSaveAs :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Maybe Text)
+menuSaveAs :: (MonadState AppState m, JsonFileIO AppState m) => Gtk.Window -> m (Maybe Text)
 menuSaveAs w = do
     filename <- saveFileChooserDialog w
     forM_ filename writeAnimationToFile
     return filename
 
-writeAnimationToFile :: (MonadState AppState m, MonadIO m) => Text -> m ()
+writeAnimationToFile :: (MonadState AppState m, JsonFileIO AppState m) => Text -> m ()
 writeAnimationToFile filename = do
-    json <- gets $ encode . ST.animation
-    liftIO $ BS.writeFile (unpack filename) json
+    appState <- get
+    writeJson (unpack filename) appState
     modify (\s -> s { ST.currentFileName = Just filename })
 
 {- If JSON decoding fails, Left "error message" will be returned just the way it comes from Aeson.
 If nothing goes wrong, then we might have a filename (Right Maybe "filename") if the
 file chooser dialog wasn't canceled.
 -}
-menuOpen :: (MonadState AppState m, MonadIO m) => Gtk.Window -> m (Either ErrorMessage (Maybe Text))
+menuOpen :: (MonadState AppState m, JsonFileIO AppState m) => Gtk.Window -> m (Either ErrorMessage (Maybe Text))
 menuOpen w = do
-    state <- get
     filename <- openFileChooserDialog w
 
     case filename of
         Nothing -> return $ Right Nothing
         Just f -> do
-            json <- liftIO $ BS.readFile (unpack f)
-            let decoded = eitherDecode json
+            decoded <- readJson (unpack f)
             case decoded of
                 Left err -> return $ Left (pack err)
-                Right animation -> do
-                    put state { ST.animation = animation, ST.currentFileName = filename }
+                Right appState -> do
+                    put appState
                     return $ Right (Just f)
 
 

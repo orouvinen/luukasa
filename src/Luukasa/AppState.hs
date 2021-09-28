@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ViewPatterns          #-}
 
@@ -6,9 +7,11 @@ module Luukasa.AppState where
 import           Data.Foldable     (toList)
 import           Data.Text         (Text)
 
+import           Data.Aeson        (FromJSON, ToJSON)
 import           Data.Map          (Map)
 import qualified Data.Map          as Map
 import           Data.Maybe        (mapMaybe)
+import           GHC.Generics      (Generic)
 import           Luukasa.Animation (Animation)
 import qualified Luukasa.Animation as A
 import           Luukasa.Body      (Body)
@@ -18,15 +21,23 @@ import qualified Luukasa.Data.Tree as T
 import           Luukasa.Joint     (Joint, JointId, JointLockMode (..))
 import qualified Luukasa.Joint     as J
 
-data DragState = DragSelected DragMode | DragSelectionRect deriving Show
+data DragState = DragSelected DragMode | DragSelectionRect deriving (Generic, Show)
+instance FromJSON DragState
+instance ToJSON DragState
+
 data ActionState
     = Idle
     | PlacingNewJoint
     | Drag DragState
     | AnimationPlayback TimerCallbackId
-    deriving Show
+    deriving (Generic, Show)
 
-data DragMode = DragMove | DragRotate deriving Show
+instance FromJSON ActionState
+instance ToJSON ActionState
+
+data DragMode = DragMove | DragRotate deriving (Generic, Show)
+instance FromJSON DragMode
+instance ToJSON DragMode
 
 defaultFps :: Int
 defaultFps = 24
@@ -49,7 +60,10 @@ data AppState = AppState
     , currentFileName   :: Maybe Text
     , jointIterLookup   :: Map Text J.JointId
     , isCellEditActive  :: Bool
-    } deriving (Show)
+    } deriving (Generic, Show)
+
+instance FromJSON AppState
+instance ToJSON AppState
 
 initialState :: AppState
 initialState = AppState

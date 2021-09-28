@@ -16,8 +16,10 @@ data JointLockMode
     | LockDrag
     -- Children rotate with the rotated joint (around the common parent)
     | LockRotate
-    deriving Show
+    deriving (Generic, Show)
 
+instance FromJSON JointLockMode
+instance ToJSON JointLockMode
 
 data Joint = Joint
     { jointId       :: JointId
