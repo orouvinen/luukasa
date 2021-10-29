@@ -7,7 +7,7 @@ import           Luukasa.AnimatorState      (AnimatorState)
 import           Luukasa.AppState           (AppState)
 import           Luukasa.Event.JsonFileIO   (JsonFileIO (..))
 import           Luukasa.Event.Keyboard     (HasKeyEvent (..))
-import           Luukasa.Event.Mouse        (HasMouseEvent (..))
+import           Luukasa.Event.Mouse        (MouseEvent (..))
 import           Luukasa.Event.Ui.UiElement (HasTreeView (..),
                                              HasUiListStore (..))
 
@@ -32,7 +32,7 @@ instance MonadState AppState EventM where
 instance HasKeyEvent EventM where
     getKey = Gdk.getEventKeyKeyval >=> Gdk.keyvalToUpper
 
-instance HasMouseEvent EventM where
+instance MouseEvent EventM where
     getScrollDirection = Gdk.getEventScrollDirection
     clickPos e = (,) <$> Gdk.getEventButtonX e <*> Gdk.getEventButtonY e
     motionPos e = (,) <$> Gdk.getEventMotionX e <*> Gdk.getEventMotionY e

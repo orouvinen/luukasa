@@ -2,7 +2,7 @@ module Luukasa.Event.Mouse where
 
 import qualified GI.Gdk as Gdk
 
-class Monad m => HasMouseEvent m where
+class Monad m => MouseEvent m where
     getScrollDirection :: Gdk.EventScroll -> m Gdk.ScrollDirection
     motionPos :: Gdk.EventMotion -> m (Double, Double)
     clickPos :: Gdk.EventButton -> m (Double, Double)

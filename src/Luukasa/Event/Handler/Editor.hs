@@ -36,8 +36,8 @@ import           Luukasa.Event.Handler.EventResult (EventResult, toEventResult,
                                                     updateAnimatorState)
 import           Luukasa.Event.JsonFileIO          (JsonFileIO (..))
 import           Luukasa.Event.Keyboard            (HasKeyEvent (..))
-import           Luukasa.Event.Mouse               (HasMouseEvent,
-                                                    clickModifiers, clickPos,
+import           Luukasa.Event.Mouse               (MouseEvent, clickModifiers,
+                                                    clickPos,
                                                     getScrollDirection,
                                                     motionModifiers, motionPos)
 import           Luukasa.Event.Ui.UiElement
@@ -52,7 +52,7 @@ selectToggleModifier = Gdk.ModifierTypeControlMask
 selectLockMode :: MonadState AppState m => JointLockMode -> m ()
 selectLockMode lockMode = modify (\s -> s { App.animatorState = (App.animatorState s) { ST.jointLockMode = lockMode } })
 
-canvasPrimaryMouseButtonClick :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventButton -> m ()
+canvasPrimaryMouseButtonClick :: (MonadState AppState m, MouseEvent m) => Gdk.EventButton -> m ()
 canvasPrimaryMouseButtonClick e = do
     s <- gets App.animatorState
 
@@ -102,7 +102,7 @@ canvasKeyPress eventKey = do
 scrollWheelScaleStep :: Double
 scrollWheelScaleStep = 0.1
 
-canvasScrollWheel :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventScroll -> m ()
+canvasScrollWheel :: (MonadState AppState m, MouseEvent m) => Gdk.EventScroll -> m ()
 canvasScrollWheel eventScroll = do
     scrollDirection <- getScrollDirection eventScroll
 
@@ -115,7 +115,7 @@ canvasScrollWheel eventScroll = do
     App.putAnimatorState s { ST.viewScale = ST.viewScale s + scaleChange }
 
 
-canvasMouseMotion :: (MonadState AppState m, HasMouseEvent m) => Gdk.EventMotion -> m ()
+canvasMouseMotion :: (MonadState AppState m, MouseEvent m) => Gdk.EventMotion -> m ()
 canvasMouseMotion e = do
     appState <- gets App.animatorState
 
