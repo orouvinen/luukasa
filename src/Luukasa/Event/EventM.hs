@@ -6,7 +6,7 @@ module Luukasa.Event.EventM where
 import           Luukasa.AnimatorState      (AnimatorState)
 import           Luukasa.AppState           (AppState)
 import           Luukasa.Event.JsonFileIO   (JsonFileIO (..))
-import           Luukasa.Event.Keyboard     (HasKeyEvent (..))
+import           Luukasa.Event.Keyboard     (KeyEvent (..))
 import           Luukasa.Event.Mouse        (MouseEvent (..))
 import           Luukasa.Event.Ui.UiElement (HasTreeView (..),
                                              HasUiListStore (..))
@@ -29,7 +29,7 @@ instance MonadState AppState EventM where
     get = ask >>= liftIO . readIORef
     put s = ask >>= \stateRef -> liftIO $ writeIORef stateRef s
 
-instance HasKeyEvent EventM where
+instance KeyEvent EventM where
     getKey = Gdk.getEventKeyKeyval >=> Gdk.keyvalToUpper
 
 instance MouseEvent EventM where

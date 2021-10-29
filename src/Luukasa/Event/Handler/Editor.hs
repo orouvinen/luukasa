@@ -35,7 +35,7 @@ import           Luukasa.EditorAction              as E (Action (..),
 import           Luukasa.Event.Handler.EventResult (EventResult, toEventResult,
                                                     updateAnimatorState)
 import           Luukasa.Event.JsonFileIO          (JsonFileIO (..))
-import           Luukasa.Event.Keyboard            (HasKeyEvent (..))
+import           Luukasa.Event.Keyboard            (KeyEvent (..))
 import           Luukasa.Event.Mouse               (MouseEvent, clickModifiers,
                                                     clickPos,
                                                     getScrollDirection,
@@ -75,7 +75,7 @@ canvasPrimaryMouseButtonRelease _ = do
     isPlaybackOn <- gets (ST.isPlaybackOn . App.animatorState)
     unless isPlaybackOn $ modify (\s' -> s' { App.animatorState = (App.animatorState s') { ST.actionState = Idle } })
 
-canvasKeyPress :: (MonadState AppState m, HasKeyEvent m) => Gdk.EventKey -> m (EventResult ())
+canvasKeyPress :: (MonadState AppState m, KeyEvent m) => Gdk.EventKey -> m (EventResult ())
 canvasKeyPress eventKey = do
     s <- gets App.animatorState
     key <- getKey eventKey
