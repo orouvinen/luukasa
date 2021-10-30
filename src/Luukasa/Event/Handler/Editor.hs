@@ -5,36 +5,29 @@
 
 module Luukasa.Event.Handler.Editor where
 
-import           Control.Monad                     (foldM, unless, void, when)
-import           Control.Monad.IO.Class            (MonadIO)
+import           Control.Monad                     (foldM, unless, when)
 import           Control.Monad.State               (MonadState, gets, modify)
-import           Data.Foldable                     (forM_)
 import           Data.Function                     ((&))
-import           Data.GI.Base                      (AttrOp ((:=)), new)
 import           Data.Int                          (Int32)
 import           Data.Map                          ((!))
 import qualified Data.Map                          as Map
-import           Data.Text                         (Text, pack, unpack)
+import           Data.Text                         (Text)
 import qualified GI.Gdk                            as Gdk
 import qualified GI.Gtk                            as Gtk
 import qualified Luukasa.Animation                 as A
 import           Luukasa.AnimatorState             (ActionState (..),
-                                                    AnimatorState,
                                                     DragMode (..),
                                                     DragState (..))
 
-import           Data.Functor                      ((<&>))
 import qualified Luukasa.AnimatorState             as ST
 import           Luukasa.AppState                  (AppState)
 import qualified Luukasa.AppState                  as App
 import qualified Luukasa.Body                      as B
-import           Luukasa.Common                    (ErrorMessage)
 import           Luukasa.EditorAction              as E (Action (..),
                                                          SelectMode (..),
                                                          dispatchAction)
 import           Luukasa.Event.Handler.EventResult (EventResult, toEventResult,
                                                     updateAnimatorState)
-import           Luukasa.Event.JsonFileIO          (JsonFileIO (..))
 import           Luukasa.Event.Keyboard            (KeyEvent (..))
 import           Luukasa.Event.Mouse               (MouseEvent, clickModifiers,
                                                     clickPos,
@@ -139,8 +132,8 @@ canvasMouseMotion e = do
                 DragSelected DragMove -> E.MoveSelected mouseX mouseY
                 DragSelected DragRotate -> E.DragRotateSelected mouseX mouseY
 
-        let result = E.dispatchAction appState { ST.actionState = Drag dragState } action
-        updateAnimatorState result
+        E.dispatchAction appState { ST.actionState = Drag dragState } action
+            & updateAnimatorState
 
 alignRadiusesToMin :: MonadState AppState m => m ()
 alignRadiusesToMin = do
@@ -219,81 +212,3 @@ setJointAttribute jointListStore path cellVal colNum updateJoint = do
             let jointIterLookup = ST.jointIterLookup appState
                 jointId = jointIterLookup ! path
             E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId updateJoint) & updateAnimatorState
-
-menuSave :: (MonadState AppState m, JsonFileIO AnimatorState m) => Gtk.Window -> m (Maybe Text)
-menuSave w = do
-    filename <- gets App.animatorState <&> ST.currentFileName
-    case filename of
-        Nothing -> void $ menuSaveAs w
-        Just f  -> writeAnimationToFile f
-    return filename
-
-menuSaveAs :: (MonadState AppState m, JsonFileIO AnimatorState m) => Gtk.Window -> m (Maybe Text)
-menuSaveAs w = do
-    filename <- saveFileChooserDialog w
-    forM_ filename writeAnimationToFile
-    return filename
-
-writeAnimationToFile :: (MonadState AppState m, JsonFileIO AnimatorState m) => Text -> m ()
-writeAnimationToFile filename = do
-    s <- gets App.animatorState
-    writeJson (unpack filename) s
-    App.putAnimatorState s { ST.currentFileName = Just filename }
-
-{- If JSON decoding fails, Left "error message" will be returned just the way it comes from Aeson.
-If nothing goes wrong, then we might have a filename (Right Maybe "filename") if the
-file chooser dialog wasn't canceled.
--}
-menuOpen :: (MonadState AppState m, JsonFileIO AnimatorState m) => Gtk.Window -> m (Either ErrorMessage (Maybe Text))
-menuOpen w = do
-    filename <- openFileChooserDialog w
-
-    case filename of
-        Nothing -> return $ Right Nothing
-        Just f -> do
-            decoded <- readJson (unpack f)
-            case decoded of
-                Left err -> return $ Left (pack err)
-                Right animatorState -> do
-                    App.putAnimatorState animatorState
-                    return $ Right (Just f)
-
-
-saveFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe Text)
-saveFileChooserDialog = fileChooserDialog Gtk.FileChooserActionSave
-
-openFileChooserDialog :: MonadIO m => Gtk.Window -> m (Maybe Text)
-openFileChooserDialog = fileChooserDialog Gtk.FileChooserActionOpen
-
-fileChooserDialog :: MonadIO m => Gtk.FileChooserAction -> Gtk.Window -> m (Maybe Text)
-fileChooserDialog actionType mainWindow = do
-    dlg <- new Gtk.FileChooserDialog
-        [ #title :=
-            if actionType == Gtk.FileChooserActionSave
-                then "Save animation"
-                else "Open animation"
-        , #action := actionType
-        ]
-
-    Gtk.windowSetTransientFor dlg $ Just mainWindow
-
-    _ <- Gtk.dialogAddButton dlg
-            (case actionType of
-                Gtk.FileChooserActionSave -> "gtk-save"
-                _                         -> "gtk-open")
-            $ (toEnum . fromEnum) Gtk.ResponseTypeAccept
-
-    _ <- Gtk.dialogAddButton dlg "gtk-cancel" $ (toEnum . fromEnum) Gtk.ResponseTypeCancel
-
-    Gtk.widgetShow dlg
-    result <- fromIntegral <$> Gtk.dialogRun dlg
-    filename <- Gtk.fileChooserGetFilename dlg
-
-    let resultFilename =
-            case toEnum result of
-                Gtk.ResponseTypeAccept -> pack <$> filename
-                _                      -> Nothing
-
-
-    Gtk.widgetDestroy dlg
-    return resultFilename
