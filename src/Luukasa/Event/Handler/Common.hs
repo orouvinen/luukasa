@@ -7,8 +7,8 @@ import           Luukasa.UiState        (UiState)
 
 
 {-|
-    gtkEntryToUiState tries to read a value from GTK entry and if successful, stores in UiState using
-    specified setter function.
+    gtkEntryToUiState tries to read a value by from GTK entry and if successful, stores it in
+    UiState using specified setter function.
 -}
 gtkEntryToUiState
     :: (MonadIO m)

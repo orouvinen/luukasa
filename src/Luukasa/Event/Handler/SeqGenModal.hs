@@ -26,9 +26,9 @@ TODO:
 
 There's bit of repetition going on. See what kind of fuckery could solve it.
 The scope of this modal code isn't too massive, so another option is to just
-leave it remove this comment.
-
+leave it and remove this comment.
 -}
+
 entryValueUpdated
     :: (MonadIO m, MonadState AppState m)
     => Gtk.Entry
