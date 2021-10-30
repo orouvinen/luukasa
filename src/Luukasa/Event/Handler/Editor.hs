@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedLabels      #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
 module Luukasa.Event.Handler.Editor where
@@ -166,7 +165,7 @@ selectJoint jointId = do
     App.putAnimatorState s { ST.selectedJointIds = [jointId] }
 
 updateJointList
-    :: (MonadState AppState m, HasUiListStore m)
+    :: (MonadState AppState m, UiListStore m)
     => Gtk.ListStore
     -> Map.Map JointId [Gtk.GValue]
     -> m ()
@@ -194,7 +193,7 @@ Anyway, the mission here is to update
     2. joint data in AppState (factual)
 -}
 setJointAttribute
-    :: (MonadState AppState m, HasUiListStore m)
+    :: (MonadState AppState m, UiListStore m)
     => Gtk.ListStore -- ^ list store to update
     -> Text          -- ^ TreeView path as given by Gdk
     -> Gtk.GValue    -- ^ Value to set to desired cell

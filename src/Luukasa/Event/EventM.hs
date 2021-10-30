@@ -8,8 +8,7 @@ import           Luukasa.AppState           (AppState)
 import           Luukasa.Event.JsonFileIO   (JsonFileIO (..))
 import           Luukasa.Event.Keyboard     (KeyEvent (..))
 import           Luukasa.Event.Mouse        (MouseEvent (..))
-import           Luukasa.Event.Ui.UiElement (HasTreeView (..),
-                                             HasUiListStore (..))
+import           Luukasa.Event.Ui.UiElement (TreeView (..), UiListStore (..))
 
 import           Control.Monad              ((>=>))
 import           Control.Monad.IO.Class     (MonadIO (liftIO))
@@ -39,7 +38,7 @@ instance MouseEvent EventM where
     clickModifiers = Gdk.getEventButtonState
     motionModifiers = Gdk.getEventMotionState
 
-instance HasUiListStore EventM where
+instance UiListStore EventM where
     clearListStore = Gtk.listStoreClear
     insertListRow listStore gvalues = Gtk.listStoreInsertWithValuesv
         listStore
@@ -48,7 +47,7 @@ instance HasUiListStore EventM where
         gvalues
     listStoreSetValue = Gtk.listStoreSetValue
 
-instance HasTreeView EventM where
+instance TreeView EventM where
     getIterAsString = Gtk.treeModelGetStringFromIter
     getIterFromString listStore s = do
         iterRes <- Gtk.treeModelGetIterFromString listStore s
