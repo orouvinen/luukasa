@@ -6,8 +6,8 @@ import           Control.Exception                 (IOException, catch)
 import           Control.Monad                     (foldM, forM_, unless, void,
                                                     when)
 import           Data.Foldable                     (Foldable (toList))
-import           Data.IORef                        (IORef, newIORef, readIORef,
-                                                    writeIORef)
+import           Data.IORef                        (IORef, modifyIORef,
+                                                    newIORef, readIORef)
 import           Data.Map                          (Map, (!))
 import qualified Data.Map                          as Map
 import           Data.Maybe                        (fromJust)
@@ -176,8 +176,7 @@ buildUi = do
     _ <- Gtk.onCellRendererTextEdited jointNameCell $ \path enteredText -> do
             newVal <- Gtk.toGValue (Just enteredText)
             runEventHandler $ EV.setJointAttribute jointListStore path newVal 0 (\j -> j { J.jointName = Just enteredText })
-            s <- readIORef stateRef
-            writeIORef stateRef $ s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } }
+            modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
     -- joint rotation min. edited
     _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
@@ -191,8 +190,7 @@ buildUi = do
                         let enteredNum = fst . head $ parsedInput
                             newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
                         in j { J.jointRotLim = newLimit })
-        s <- readIORef stateRef
-        writeIORef stateRef s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } }
+        modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
     -- joint rotation max edited
     _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
@@ -206,8 +204,7 @@ buildUi = do
                         let enteredNum = fst $ head parsedInput
                             newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
                         in j { J.jointRotLim = newLimit })
-        s <- readIORef stateRef
-        writeIORef stateRef s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } }
+        modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
 
     -- Set editing flag when any of the joint list columns are getting edited
@@ -215,8 +212,7 @@ buildUi = do
         [jointNameCell, jointRotMinCell, jointRotMaxCell]
         (\cell -> do
             void $ Gtk.onCellRendererEditingStarted cell $ \_ _ -> do
-                s <- readIORef stateRef
-                writeIORef stateRef s { App.uiState = (App.uiState s) { UI.isCellEditActive = True } })
+                modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = True } }))
 
     _ <- Gtk.onWidgetDestroy window Gtk.mainQuit
 
