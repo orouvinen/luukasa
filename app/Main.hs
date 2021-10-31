@@ -175,35 +175,44 @@ buildUi = do
     -- joint name edited
     _ <- Gtk.onCellRendererTextEdited jointNameCell $ \path enteredText -> do
             newVal <- Gtk.toGValue (Just enteredText)
-            runEventHandler $ EV.setJointAttribute jointListStore path newVal 0 (\j -> j { J.jointName = Just enteredText })
+            mbJointId <- runEventHandler $ EV.setJointListCellValue jointListStore path newVal 0
+            case mbJointId of
+                Nothing -> return ()
+                Just jointId -> runEventHandler $ EV.updateJointWith jointId (\j -> j { J.jointName = Just enteredText })
             modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
     -- joint rotation min. edited
     _ <- Gtk.onCellRendererTextEdited jointRotMinCell $ \path enteredText -> do
         newVal <- Gtk.toGValue (Just enteredText)
-        runEventHandler $ EV.setJointAttribute jointListStore path newVal 1
-            (\j ->
-                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
-                in if null parsedInput
-                    then j
-                    else
-                        let enteredNum = fst . head $ parsedInput
-                            newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
-                        in j { J.jointRotLim = newLimit })
+        mbJointId <- runEventHandler $ EV.setJointListCellValue jointListStore path newVal 1
+        case mbJointId of
+            Nothing -> return ()
+            Just jointId -> runEventHandler $ EV.updateJointWith jointId
+                (\j ->
+                    let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+                    in if null parsedInput
+                        then j
+                        else
+                            let enteredNum = fst . head $ parsedInput
+                                newLimit = setLower (J.jointRotLim j) (mkDegrees enteredNum)
+                            in j { J.jointRotLim = newLimit })
         modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
     -- joint rotation max edited
     _ <- Gtk.onCellRendererTextEdited jointRotMaxCell $ \path enteredText -> do
         newVal <- Gtk.toGValue (Just enteredText)
-        runEventHandler $ EV.setJointAttribute jointListStore path newVal 2
-            (\j ->
-                let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
-                in if null parsedInput
-                    then j
-                    else
-                        let enteredNum = fst $ head parsedInput
-                            newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
-                        in j { J.jointRotLim = newLimit })
+        mbJointId <- runEventHandler $ EV.setJointListCellValue jointListStore path newVal 2
+        case mbJointId of
+            Nothing -> return ()
+            Just jointId -> runEventHandler $ EV.updateJointWith jointId
+                (\j ->
+                    let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
+                    in if null parsedInput
+                        then j
+                        else
+                            let enteredNum = fst $ head parsedInput
+                                newLimit = setUpper (J.jointRotLim j) (mkDegrees enteredNum)
+                            in j { J.jointRotLim = newLimit })
         modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
 

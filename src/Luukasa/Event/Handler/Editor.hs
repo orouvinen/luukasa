@@ -4,16 +4,10 @@
 
 module Luukasa.Event.Handler.Editor where
 
-import           Control.Monad                     (foldM, unless, when)
+import           Control.Monad                     (unless, when)
 import           Control.Monad.State               (MonadState, gets, modify)
 import           Data.Function                     ((&))
-import           Data.Int                          (Int32)
-import           Data.Map                          ((!))
-import qualified Data.Map                          as Map
-import           Data.Text                         (Text)
 import qualified GI.Gdk                            as Gdk
-import qualified GI.Gtk                            as Gtk
-import qualified Luukasa.Animation                 as A
 import           Luukasa.AnimatorState             (ActionState (..),
                                                     DragMode (..),
                                                     DragState (..))
@@ -21,7 +15,6 @@ import           Luukasa.AnimatorState             (ActionState (..),
 import qualified Luukasa.AnimatorState             as ST
 import           Luukasa.AppState                  (AppState)
 import qualified Luukasa.AppState                  as App
-import qualified Luukasa.Body                      as B
 import           Luukasa.EditorAction              as E (Action (..),
                                                          SelectMode (..),
                                                          dispatchAction)
@@ -32,10 +25,8 @@ import           Luukasa.Event.Mouse               (MouseEvent, clickModifiers,
                                                     clickPos,
                                                     getScrollDirection,
                                                     motionModifiers, motionPos)
-import           Luukasa.Event.Ui.UiElement
 import           Luukasa.Joint                     (Joint, JointId,
                                                     JointLockMode (..))
-import qualified Luukasa.Joint                     as J
 
 jointDragLockModifier, selectToggleModifier :: Gdk.ModifierType
 jointDragLockModifier = Gdk.ModifierTypeShiftMask
@@ -164,50 +155,7 @@ selectJoint jointId = do
     s <- gets App.animatorState
     App.putAnimatorState s { ST.selectedJointIds = [jointId] }
 
-updateJointList
-    :: (MonadState AppState m, UiListStore m)
-    => Gtk.ListStore
-    -> Map.Map JointId [Gtk.GValue]
-    -> m ()
-updateJointList jointListStore jointValues = do
-    s <- gets App.animatorState
-    clearListStore jointListStore
-
-    let joints = B.toJointList $ A.currentFrameData (ST.animation s)
-
-    iterLookup <- foldM (\lkup j -> do
-            iter <- insertListRow jointListStore (jointValues ! J.jointId j)
-            iterAsString <- getIterAsString jointListStore iter
-            return $ Map.insert iterAsString (J.jointId j) lkup)
-        (Map.empty :: Map.Map Text JointId)
-        joints
-
-    App.putAnimatorState s { ST.jointIterLookup = iterLookup }
-
-{- TODO: this is awful in few different ways.
-Of course, everything has potential for refactoring, but oh boy
-has this some priority..
-
-Anyway, the mission here is to update
-    1. joint value on UI (visual)
-    2. joint data in AppState (factual)
--}
-setJointAttribute
-    :: (MonadState AppState m, UiListStore m)
-    => Gtk.ListStore -- ^ list store to update
-    -> Text          -- ^ TreeView path as given by Gdk
-    -> Gtk.GValue    -- ^ Value to set to desired cell
-    -> Int32         -- ^ Column number for the data
-    -> (Joint -> Joint) -- ^ Function to update joint data
-    -> m ()
-setJointAttribute jointListStore path cellVal colNum updateJoint = do
-    mbIter <- getIterFromString jointListStore path
-    case mbIter of
-        Nothing -> return ()
-        Just iter -> do
-            listStoreSetValue jointListStore iter colNum cellVal
-
-            appState <- gets App.animatorState
-            let jointIterLookup = ST.jointIterLookup appState
-                jointId = jointIterLookup ! path
-            E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId updateJoint) & updateAnimatorState
+updateJointWith :: MonadState AppState m => JointId -> (Joint -> Joint) -> m ()
+updateJointWith jointId f = do
+    appState <- gets App.animatorState
+    E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId f) & updateAnimatorState
