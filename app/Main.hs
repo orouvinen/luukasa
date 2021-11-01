@@ -24,7 +24,8 @@ import qualified Luukasa.AnimatorState             as ST
 import           Luukasa.AppState                  (AppState)
 import qualified Luukasa.AppState                  as App
 import qualified Luukasa.Body                      as B
-import           Luukasa.Common                    (ErrorMessage)
+import           Luukasa.Common                    (ErrorMessage, parseDouble,
+                                                    parseInt)
 import           Luukasa.Event.EventM              (EventM, runEvent)
 import qualified Luukasa.Event.Handler             as EV
 import qualified Luukasa.Event.Handler.SeqGenModal as SeqGenModal
@@ -374,17 +375,3 @@ playbackHandler stateRef canvas btnPlayback = do
             runEventHandler $ EV.startPlayback tickCallbackId timestamp
         _ -> return ()
 
-{- Something needs to be done to these. And they don't belong here either. But for now I just want things to work. Hence these parse-things. -}
-parseInt :: T.Text -> Maybe Int
-parseInt x =
-    let parsed = reads (T.unpack x) :: [(Int, String)]
-    in if null parsed
-        then Nothing
-        else Just $ fst $ head parsed
-
-parseDouble :: T.Text -> Maybe Double
-parseDouble x =
-    let parsed = reads (T.unpack x) :: [(Double, String)]
-    in if null parsed
-        then Nothing
-        else Just $ fst $ head parsed
