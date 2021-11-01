@@ -154,8 +154,3 @@ selectJoint :: MonadState AppState m => JointId -> m ()
 selectJoint jointId = do
     s <- gets App.animatorState
     App.putAnimatorState s { ST.selectedJointIds = [jointId] }
-
-updateJointWith :: MonadState AppState m => JointId -> (Joint -> Joint) -> m ()
-updateJointWith jointId f = do
-    appState <- gets App.animatorState
-    E.dispatchAction appState (E.ApplyToAnimationJointWithId jointId f) & updateAnimatorState

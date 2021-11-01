@@ -179,7 +179,7 @@ buildUi = do
             mbJointId <- runEventHandler $ EV.setJointListCellValue jointListStore path newVal 0
             case mbJointId of
                 Nothing -> return ()
-                Just jointId -> runEventHandler $ EV.updateJointWith jointId (\j -> j { J.jointName = Just enteredText })
+                Just jointId -> runEventHandler $ EV.modifyAnimationJointWith jointId (\j -> j { J.jointName = Just enteredText })
             modifyIORef stateRef (\s -> s { App.uiState = (App.uiState s) { UI.isCellEditActive = False } })
 
     -- joint rotation min. edited
@@ -188,7 +188,7 @@ buildUi = do
         mbJointId <- runEventHandler $ EV.setJointListCellValue jointListStore path newVal 1
         case mbJointId of
             Nothing -> return ()
-            Just jointId -> runEventHandler $ EV.updateJointWith jointId
+            Just jointId -> runEventHandler $ EV.modifyAnimationJointWith jointId
                 (\j ->
                     let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
                     in if null parsedInput
@@ -205,7 +205,7 @@ buildUi = do
         mbJointId <- runEventHandler $ EV.setJointListCellValue jointListStore path newVal 2
         case mbJointId of
             Nothing -> return ()
-            Just jointId -> runEventHandler $ EV.updateJointWith jointId
+            Just jointId -> runEventHandler $ EV.modifyAnimationJointWith jointId
                 (\j ->
                     let parsedInput = reads (T.unpack enteredText) :: [(Double, String)]
                     in if null parsedInput
