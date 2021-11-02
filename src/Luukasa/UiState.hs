@@ -14,8 +14,7 @@ data UiState = UiState
 
 -- This should live in src/Luukasa/Event/Handler/SeqGenModal.hs ?
 data FrameGenModal = FrameGenModal
-    { seqType        :: Gen.SeqType
-    , targetType     :: Gen.TargetType
+    { targetType     :: Gen.TargetType
     , targetX        :: Double
     , targetY        :: Double
     , targetLocalRot :: Double
@@ -30,8 +29,7 @@ data FrameGenModal = FrameGenModal
 initialUiState :: UiState
 initialUiState = UiState
     { frameGenModal = FrameGenModal
-        { seqType = Gen.Still
-        , targetType = Gen.TargetPos
+        { targetType = Gen.TargetPos
         , targetX = 0
         , targetY = 0
         -- TODO: only one degrees input field needed; the semantics of the value is determined by targetType.
@@ -52,13 +50,12 @@ mapGenModalToSeqDescriptor s =
         let frameSpan   = Gen.FrameSpan (startFrame s) (endFrame s)
         in
             Gen.GenSequence
-                { Gen.seqType = seqType s
-                , Gen.seqDuration =
+                { Gen.seq =
                     case targetType s of
-                        Gen.TargetPos         -> Gen.WrapDuration $ Gen.SeqDuration frameSpan (Gen.ToPosition (targetX s) (targetY s))
-                        Gen.TargetLocalRot    -> Gen.WrapDuration $ Gen.SeqDuration frameSpan (Gen.ToLocalRot (Units.mkDegrees $ targetLocalRot s))
-                        Gen.TargetWorldRot    -> Gen.WrapDuration $ Gen.SeqDuration frameSpan (Gen.ToWorldRot (Units.mkDegrees $ targetWorldRot s))
-                        Gen.TargetRotateDelta -> Gen.WrapDuration $ Gen.SeqDuration frameSpan (Gen.RotateDelta (Units.mkDegrees $ targetRotDelta s))
+                        Gen.TargetPos         -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.ToPosition (targetX s) (targetY s))
+                        Gen.TargetLocalRot    -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.ToLocalRot (Units.mkDegrees $ targetLocalRot s))
+                        Gen.TargetWorldRot    -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.ToWorldRot (Units.mkDegrees $ targetWorldRot s))
+                        Gen.TargetRotateDelta -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.RotateDelta (Units.mkDegrees $ targetRotDelta s))
                 , Gen.seqObject = Gen.SeqObject [] -- TODO
                 , Gen.seqAcc =
                     case accelType s of

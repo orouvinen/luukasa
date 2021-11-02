@@ -134,9 +134,6 @@ buildUi = do
     genTargetLocalRot               <- GO.builderGetObject builder "genTargetLocalRot" >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
     genTargetWorldRot               <- GO.builderGetObject builder "genTargetWorldRot" >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
     genTargetRotDelta               <- GO.builderGetObject builder "genTargetRotDelta"  >>= Gtk.unsafeCastTo Gtk.Entry . fromJust
-    genRadioSeqTypeStill            <- GO.builderGetObject builder "radioSeqTypeStill"     >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
-    genRadioSeqTypeTranslate        <- GO.builderGetObject builder "radioSeqTypeTranslate" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
-    genRadioSeqTypeRotate           <- GO.builderGetObject builder "radioSeqTypeRotate"    >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
     genRadioSeqTargetPos            <- GO.builderGetObject builder "radioSeqTargetPosition" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
     genRadioSeqTargetLocalRot       <- GO.builderGetObject builder "radioSeqTargetLocalRot" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
     genRadioSeqTargetWorldRot       <- GO.builderGetObject builder "radioSeqTargetWorldRot" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
@@ -155,11 +152,6 @@ buildUi = do
     _ <- Gtk.onEditableChanged genTargetLocalRot $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\v s -> s { UI.targetLocalRot = v })
     _ <- Gtk.onEditableChanged genTargetWorldRot $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\v s -> s { UI.targetWorldRot = v })
     _ <- Gtk.onEditableChanged genTargetRotDelta $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetY parseDouble (\v s -> s { UI.targetRotDelta = v })
-
-    -- Sequence type selection radio buttons
-    _ <- Gtk.onButtonClicked genRadioSeqTypeStill $ runEventHandler $ SeqGenModal.setSeqType SeqGenModal.Still
-    _ <- Gtk.onButtonClicked genRadioSeqTypeTranslate $ runEventHandler $ SeqGenModal.setSeqType SeqGenModal.Translate
-    _ <- Gtk.onButtonClicked genRadioSeqTypeRotate $ runEventHandler $ SeqGenModal.setSeqType SeqGenModal.Rotate
 
     -- Sequence accel type radio buttons
     _ <- Gtk.onButtonClicked genRadioSeqAccelTypePerFrame $ runEventHandler $ SeqGenModal.setAccelType SeqGenModal.AccelPerFrame

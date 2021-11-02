@@ -135,12 +135,12 @@ alignRadiusesToMax = do
     s <- gets App.animatorState
     E.dispatchAction s E.LevelSelectedRadiusesToMax & updateAnimatorState
 
-setViewScale ::  MonadState AppState m => Double -> m ()
+setViewScale :: MonadState AppState m => Double -> m ()
 setViewScale scaleFactor = do
     s <- gets App.animatorState
     App.putAnimatorState s { ST.viewScale = scaleFactor }
 
-setViewTranslate ::  MonadState AppState m => Double -> Double -> m ()
+setViewTranslate :: MonadState AppState m => Double -> Double -> m ()
 setViewTranslate trX trY = do
     s <- gets App.animatorState
     App.putAnimatorState s { ST.translateX = trX, ST.translateY = trY }
