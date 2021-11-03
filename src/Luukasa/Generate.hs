@@ -27,13 +27,14 @@ data SeqAccel (t :: AccelType) where
     PerSecond :: Double -> SeqAccel 'AccelPerSecond
 
 data GenSequence = GenSequence
-    { seq       :: SequenceWrapper
-    , seqObject :: SeqObject
-    , seqAcc    :: AccelWrapper
+    { seqTarget    :: TargetWrapper
+    , seqFrameSpan :: FrameSpan
+    , seqObject    :: SeqObject
+    , seqAcc       :: AccelWrapper
     }
 
-data SequenceWrapper where
-    WrapSequence :: Sequence (t :: TargetType) -> SequenceWrapper
+data TargetWrapper where
+    WrapTarget :: SeqTarget (t :: TargetType) -> TargetWrapper
 
 data AccelWrapper where
     WrapAccel :: SeqAccel (a :: AccelType) -> AccelWrapper

@@ -32,8 +32,6 @@ initialUiState = UiState
         { targetType = Gen.TargetPos
         , targetX = 0
         , targetY = 0
-        -- TODO: only one degrees input field needed; the semantics of the value is determined by targetType.
-        -- Remove extra inputs from UI and here.
         , targetLocalRot = 0
         , targetWorldRot = 0
         , targetRotDelta = 0
@@ -45,17 +43,18 @@ initialUiState = UiState
     , isCellEditActive = False
     }
 
-mapGenModalToSeqDescriptor :: FrameGenModal-> Gen.GenSequence
-mapGenModalToSeqDescriptor s =
+frameGenModalToSequenceDescriptor :: FrameGenModal-> Gen.GenSequence
+frameGenModalToSequenceDescriptor s =
         let frameSpan   = Gen.FrameSpan (startFrame s) (endFrame s)
         in
             Gen.GenSequence
-                { Gen.seq =
+                { Gen.seqTarget =
                     case targetType s of
-                        Gen.TargetPos         -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.ToPosition (targetX s) (targetY s))
-                        Gen.TargetLocalRot    -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.ToLocalRot (Units.mkDegrees $ targetLocalRot s))
-                        Gen.TargetWorldRot    -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.ToWorldRot (Units.mkDegrees $ targetWorldRot s))
-                        Gen.TargetRotateDelta -> Gen.WrapSequence $ Gen.Sequence frameSpan (Gen.RotateDelta (Units.mkDegrees $ targetRotDelta s))
+                        Gen.TargetPos         -> Gen.WrapTarget $ Gen.ToPosition (targetX s) (targetY s)
+                        Gen.TargetLocalRot    -> Gen.WrapTarget $ Gen.ToLocalRot (Units.mkDegrees $ targetLocalRot s)
+                        Gen.TargetWorldRot    -> Gen.WrapTarget $ Gen.ToWorldRot (Units.mkDegrees $ targetWorldRot s)
+                        Gen.TargetRotateDelta -> Gen.WrapTarget $ Gen.RotateDelta (Units.mkDegrees $ targetRotDelta s)
+                , Gen.seqFrameSpan = frameSpan
                 , Gen.seqObject = Gen.SeqObject [] -- TODO
                 , Gen.seqAcc =
                     case accelType s of
