@@ -8,12 +8,11 @@ import qualified Luukasa.Generate as Gen
 import qualified Units
 
 data UiState = UiState
-    { frameGenModal    :: FrameGenModal
+    { seqGenModal      :: SeqGenModal
     , isCellEditActive :: Bool
     }
 
--- This should live in src/Luukasa/Event/Handler/SeqGenModal.hs ?
-data FrameGenModal = FrameGenModal
+data SeqGenModal = SeqGenModal
     { targetType     :: Gen.TargetType
     , targetX        :: Double
     , targetY        :: Double
@@ -28,7 +27,7 @@ data FrameGenModal = FrameGenModal
 
 initialUiState :: UiState
 initialUiState = UiState
-    { frameGenModal = FrameGenModal
+    { seqGenModal = SeqGenModal
         { targetType = Gen.TargetPos
         , targetX = 0
         , targetY = 0
@@ -43,8 +42,8 @@ initialUiState = UiState
     , isCellEditActive = False
     }
 
-frameGenModalToSequenceDescriptor :: FrameGenModal-> Gen.GenSequence
-frameGenModalToSequenceDescriptor s =
+seqGenModalToSequenceDescriptor :: SeqGenModal -> Gen.GenSequence
+seqGenModalToSequenceDescriptor s =
         let frameSpan   = Gen.FrameSpan (startFrame s) (endFrame s)
         in
             Gen.GenSequence

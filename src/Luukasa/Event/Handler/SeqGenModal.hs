@@ -23,22 +23,22 @@ entryValueUpdated
     :: (MonadIO m, MonadState AppState m)
     => Gtk.Entry
     -> (T.Text -> Maybe a)
-    -> (a -> Ui.FrameGenModal -> Ui.FrameGenModal)
+    -> (a -> Ui.SeqGenModal -> Ui.SeqGenModal)
     -> m ()
 entryValueUpdated inputWidget parseValue updateModel = do
     uiState <- gets App.uiState
     uiState' <- gtkEntryToUiState inputWidget parseValue
-        (\x ui -> ui { Ui.frameGenModal = updateModel x (Ui.frameGenModal ui) }) uiState
+        (\x ui -> ui { Ui.seqGenModal = updateModel x (Ui.seqGenModal ui) }) uiState
     App.putUiState uiState'
 
 setAccelType :: MonadState AppState m => Gen.AccelType -> m ()
 setAccelType accelType = do
     ui <- gets App.uiState
-    let seqGen = Ui.frameGenModal ui
-    App.putUiState ui { Ui.frameGenModal = seqGen { Ui.accelType = accelType } }
+    let seqGen = Ui.seqGenModal ui
+    App.putUiState ui { Ui.seqGenModal = seqGen { Ui.accelType = accelType } }
 
 setTargetType :: MonadState AppState m => Gen.TargetType -> m ()
 setTargetType targetType = do
     ui <- gets App.uiState
-    let seqGen = Ui.frameGenModal ui
-    App.putUiState ui { Ui.frameGenModal = seqGen { Ui.targetType = targetType } }
+    let seqGen = Ui.seqGenModal ui
+    App.putUiState ui { Ui.seqGenModal = seqGen { Ui.targetType = targetType } }
