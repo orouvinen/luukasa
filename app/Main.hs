@@ -142,9 +142,10 @@ buildUi = do
     genRadioSeqAccelTypePerSecond   <- GO.builderGetObject builder "radioGenAccelPerSecond" >>= Gtk.unsafeCastTo Gtk.RadioButton . fromJust
 
     btnSeqGenOk <- GO.builderGetObject builder "genOk" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
-    btnSeqGenCancel <- GO.builderGetObject builder "genCancel" >>= Gtk.unsafeCastTo Gtk.Button . fromJust
 
-    -- (numeric) entries
+    -- Event handlers
+
+    -- Seq. gen. modal numeric entires
     _ <- Gtk.onEditableChanged genStartFrame $ runEventHandler $ SeqGenModal.entryValueUpdated genStartFrame parseInt (\v s -> s { UI.startFrame = v })
     _ <- Gtk.onEditableChanged genEndFrame $ runEventHandler $ SeqGenModal.entryValueUpdated genStartFrame parseInt (\v s -> s { UI.endFrame = v })
     _ <- Gtk.onEditableChanged genTargetX $ runEventHandler $ SeqGenModal.entryValueUpdated genTargetX parseDouble (\x s -> s { UI.targetX = x })
@@ -163,7 +164,7 @@ buildUi = do
     _ <- Gtk.onButtonClicked genRadioSeqTargetWorldRot $ runEventHandler $ SeqGenModal.setTargetType SeqGenModal.TargetWorldRot
     _ <- Gtk.onButtonClicked genRadioSeqTargetRotDelta $ runEventHandler $ SeqGenModal.setTargetType SeqGenModal.TargetRotateDelta
 
-    -- Event handlers
+    _ <- Gtk.onButtonClicked btnSeqGenOk $ void $ runEventHandlerWithResult (putStrLn . T.unpack) SeqGenModal.runSequence
 
     -- joint name edited
     _ <- Gtk.onCellRendererTextEdited jointNameCell $ \path enteredText -> do
@@ -316,7 +317,7 @@ buildUi = do
 
     -- Edit menu
     _ <- Gtk.onMenuItemActivate editSeqGen $ do
-        res <- Gtk.dialogRun dlgSeqGen
+        _ <- Gtk.dialogRun dlgSeqGen
         Gtk.widgetHide dlgSeqGen
         return ()
 

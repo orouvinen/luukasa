@@ -54,7 +54,7 @@ seqGenModalToSequenceDescriptor s =
                         Gen.TargetWorldRot    -> Gen.WrapTarget $ Gen.ToWorldRot (Units.mkDegrees $ targetWorldRot s)
                         Gen.TargetRotateDelta -> Gen.WrapTarget $ Gen.RotateDelta (Units.mkDegrees $ targetRotDelta s)
                 , Gen.seqFrameSpan = frameSpan
-                , Gen.seqObject = Gen.SeqObject [] -- TODO
+                , Gen.seqObject = Gen.SeqObject (-1) -- TODO
                 , Gen.seqAcc =
                     case accelType s of
                         Gen.AccelPerFrame -> Gen.WrapAccel $ Gen.PerFrame (accel s)

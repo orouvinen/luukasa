@@ -19,7 +19,7 @@ data FrameSpan = FrameSpan Int Int
 
 data Sequence (t :: TargetType) = Sequence FrameSpan (SeqTarget t)
 
-newtype SeqObject = SeqObject [JointId]
+newtype SeqObject = SeqObject JointId
 
 data AccelType = AccelPerFrame | AccelPerSecond
 data SeqAccel (t :: AccelType) where

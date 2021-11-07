@@ -108,7 +108,7 @@ canvasMouseMotion e = do
     when (mouseBtnPressed && ST.selectionSize appState == 1) $ do
         (mouseX, mouseY) <- motionPos e
         let dragState =
-                if ST.selectionSize appState == 0
+                if ST.selectionSize appState == 0 -- This isn't going to happen btw :p
                     then DragSelectionRect
                     else DragSelected $ if toggleDragMode then toggledDragMode else defaultDragMode
                         where
