@@ -2,6 +2,11 @@
 
 Luukasa is a simple 2D skeletal animator.
 
+## Status
+
+Currently re-thinking the design of the program. Will continue coding once
+I get a solid plan going.
+
 ## Background
 
 Once, I had an (very unoriginal) idea for a game,
@@ -22,7 +27,6 @@ I originally started writing this in C few years back but the project was
 halt at some point.  Now, I've been learning Haskell slowly on my free time,
 and I desperately have been needing something nice and motivating to work on to
 get my hands dirty and here we are again.
-
 
 ## Building and running
 ```
