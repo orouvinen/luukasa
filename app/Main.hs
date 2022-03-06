@@ -273,7 +273,9 @@ buildUi = do
     source: https://gtk-d.dpldocs.info/gtk.DrawingArea.DrawingArea.html
     -}
     _ <- Gtk.onWidgetKeyPressEvent window $ \ev -> do
-        _ <- runEventHandlerWithResult (Gtk.labelSetText statusBar) (EV.canvasKeyPress ev)
+        isCellEditing <- UI.isCellEditActive . App.uiState <$> readIORef stateRef
+        unless isCellEditing $ void $ runEventHandlerWithResult (Gtk.labelSetText statusBar) (EV.canvasKeyPress ev)
+
 
         -- For now, handle playback event here directly
         key <- Gdk.getEventKeyKeyval ev
