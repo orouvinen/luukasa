@@ -4,8 +4,7 @@ Luukasa is a simple 2D skeletal animator.
 
 ## Status
 
-Currently re-thinking the design of the program. Will continue coding once
-I get a solid plan going.
+Not active. I'm hoping to get back to this at some point.
 
 ## Background
 
